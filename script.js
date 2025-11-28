@@ -1,14 +1,21 @@
+// Registra o plugin de DataLabels
+if (typeof ChartDataLabels !== 'undefined') {
+    Chart.register(ChartDataLabels);
+}
+
 // Variável global para guardar a instância do gráfico e poder destruí-la
 let myChart;
+let hourlyChartInstance;
+let overviewPieChartInstance; 
 
-// Formatador de números global para 'en-US' (usa . como decimal)
-const formatter = new Intl.NumberFormat('en-US', {
+// Formatador de números global para 'pt-BR' (usa , como decimal e . como milhar)
+const formatter = new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
 });
 
-// Formatador de porcentagem para 'en-US'
-const formatterPct = new Intl.NumberFormat('en-US', {
+// Formatador de porcentagem para 'pt-BR'
+const formatterPct = new Intl.NumberFormat('pt-BR', {
     style: 'percent',
     minimumFractionDigits: 1,
     maximumFractionDigits: 1
@@ -16,33 +23,32 @@ const formatterPct = new Intl.NumberFormat('en-US', {
 
 // Define a duração (em horas) de cada período
 const periodDurations = {
-    manha: 6,       // 7, 8, 9, 10, 11, 12 (6 horas)
-    tarde: 4,       // 13, 14, 15, 16 (4 horas)
-    foraHorario: 5, // 17, 18, 19, 20, 21 (5 horas)
-    noite: 9        // 22, 23, 0, 1, 2, 3, 4, 5, 6 (9 horas)
+    manha: 4.75,
+    tarde: 4,
+    foraHorario: 5,
+    noite: 9
 };
-// Variável global para o novo gráfico de linha
-let hourlyChartInstance;
-// Variáveis globais para guardar os dados parseados
+
 let parsedDataCache = {};
+let analysisResultsCache = {};
 
-
+// BOTÃO "PROCESSAR DADOS"
 document.getElementById('extractButton').addEventListener('click', () => {
     const pasteBox = document.getElementById('pasteBox');
     const statusMessage = document.getElementById('statusMessage');
     const resultsArea = document.getElementById('resultsArea');
+    const inputSection = document.getElementById('inputSection');
+    const headerControls = document.getElementById('headerControls');
 
-    // Esconde resultados antigos
     resultsArea.classList.add('hidden');
+    statusMessage.textContent = ''; 
     
-    // 1. Obter o HTML colado
     const pastedHtml = pasteBox.innerHTML;
     if (!pastedHtml.trim()) {
         showMessage("A caixa de colagem está vazia. Cole a tabela primeiro.", "error");
         return;
     }
 
-    // 2. Criar um elemento temporário para analisar o HTML
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = pastedHtml;
     const table = tempDiv.querySelector('table');
@@ -52,34 +58,33 @@ document.getElementById('extractButton').addEventListener('click', () => {
         return;
     }
 
-    // --- 4. ANÁLISE DE DADOS ---
     try {
-        // Parseia a tabela para um objeto JS com números
         const parsedData = parseHtmlTable(table);
-        // Salva os dados no cache global
         parsedDataCache = parsedData;
 
-        // Calcula os totais dos períodos
         const analysisResults = analyzeProductionData(parsedData.data);
+        analysisResultsCache = analysisResults;
 
-        // Exibe a nova tabela de detalhes
         displaySectorTable(analysisResults.sectorBreakdown);
-
-        // Exibe o gráfico
         displayProductionChart(analysisResults.sectorBreakdown);
 
-        // Popula o seletor de setor
-        populateSectorCheckboxes(parsedData.data);
-
-        // Exibe o gráfico de linha para o primeiro setor por padrão
-        if (parsedData.data.length > 0) {
-            const firstSectorName = parsedData.data[0][Object.keys(parsedData.data[0])[0]];
-            displayHourlyChart([firstSectorName]); // Passa como um array
+        let defaultIndex = 0;
+        if (parsedData.data.length >= 2) {
+            defaultIndex = 1; 
         }
 
-        // Mostra a área de resultados
+        initOverviewSection(parsedData.data, analysisResults.sectorBreakdown, defaultIndex);
+        populateSectorCheckboxes(parsedData.data, defaultIndex);
+        
+        const defaultSectorName = parsedData.data[defaultIndex][Object.keys(parsedData.data[defaultIndex])[0]];
+        displayHourlyChart([defaultSectorName]); 
+
+        // SUCESSO: Mostrar resultados e esconder inputs
         resultsArea.classList.remove('hidden');
-        showMessage("Dados processados com sucesso!", "success");
+        inputSection.classList.add('hidden'); 
+        headerControls.classList.remove('hidden'); 
+        
+        statusMessage.textContent = ''; 
 
     } catch (error) {
         console.error("Erro ao analisar dados:", error);
@@ -87,10 +92,131 @@ document.getElementById('extractButton').addEventListener('click', () => {
     }
 });
 
-// Função para parsear a tabela para objetos JS
+// BOTÃO "NOVA CONSULTA"
+document.getElementById('showInputBtn').addEventListener('click', () => {
+    const inputSection = document.getElementById('inputSection');
+    const headerControls = document.getElementById('headerControls');
+    const resultsArea = document.getElementById('resultsArea');
+
+    inputSection.classList.remove('hidden');
+    headerControls.classList.add('hidden');
+    resultsArea.classList.add('hidden'); 
+});
+
+
+// --- FUNÇÕES DA NOVA SEÇÃO DE VISÃO GERAL ---
+
+function initOverviewSection(rawData, sectorBreakdown, defaultIndex) {
+    const select = document.getElementById('overviewSectorSelect');
+    select.innerHTML = ''; 
+
+    sectorBreakdown.forEach((item, index) => {
+        const option = document.createElement('option');
+        option.value = index; 
+        option.text = item.setor;
+        select.appendChild(option);
+    });
+
+    select.selectedIndex = defaultIndex;
+
+    select.addEventListener('change', (e) => {
+        const selectedIdx = e.target.value;
+        updateOverviewData(selectedIdx, sectorBreakdown);
+    });
+
+    updateOverviewData(defaultIndex, sectorBreakdown);
+}
+
+function updateOverviewData(index, sectorBreakdown) {
+    const item = sectorBreakdown[index];
+    if (!item) return;
+
+    // 1. Cálculos de Médias
+    const totalHours = periodDurations.manha + periodDurations.tarde + periodDurations.foraHorario + periodDurations.noite;
+    const globalAverage = item.totalSetor / totalHours;
+
+    const avgManha = periodDurations.manha > 0 ? item.manha / periodDurations.manha : 0;
+    const avgTarde = periodDurations.tarde > 0 ? item.tarde / periodDurations.tarde : 0;
+    const avgFora = periodDurations.foraHorario > 0 ? item.foraHorario / periodDurations.foraHorario : 0;
+    const avgNoite = periodDurations.noite > 0 ? item.noite / periodDurations.noite : 0;
+
+    // 2. Atualiza HTML dos números
+    document.getElementById('overviewBigNumber').textContent = formatter.format(globalAverage);
+    document.getElementById('avgManhaDisplay').textContent = formatter.format(avgManha);
+    document.getElementById('avgTardeDisplay').textContent = formatter.format(avgTarde);
+    document.getElementById('avgForaDisplay').textContent = formatter.format(avgFora);
+    document.getElementById('avgNoiteDisplay').textContent = formatter.format(avgNoite);
+
+    // 3. Atualiza Gráfico de Pizza
+    const ctx = document.getElementById('overviewPieChart').getContext('2d');
+    
+    if (overviewPieChartInstance) {
+        overviewPieChartInstance.destroy();
+    }
+
+    // Prepara labels para a legenda (Inclui unidade m²)
+    const labels = [
+        `Manhã: ${formatter.format(item.manha)} m²`, 
+        `Tarde: ${formatter.format(item.tarde)} m²`, 
+        `Fora Horário: ${formatter.format(item.foraHorario)} m²`, 
+        `Noite: ${formatter.format(item.noite)} m²`
+    ];
+    
+    const dataValues = [item.manha, item.tarde, item.foraHorario, item.noite];
+
+    overviewPieChartInstance = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: dataValues,
+                backgroundColor: [
+                    'rgba(54, 162, 235, 0.8)', // Azul
+                    'rgba(75, 192, 192, 0.8)', // Verde
+                    'rgba(255, 206, 86, 0.8)', // Amarelo
+                    'rgba(75, 0, 130, 0.8)'    // Roxo
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                datalabels: {
+                    display: false
+                },
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 20, 
+                        font: {
+                            size: 14 
+                        },
+                        padding: 20
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let originalLabel = context.label.split(':')[0]; 
+                            let value = context.parsed;
+                            let total = context.chart._metasets[context.datasetIndex].total;
+                            let percentage = (value / total * 100).toFixed(1) + '%';
+                            // Exibe unidade m² no tooltip
+                            return `${originalLabel}: ${formatter.format(value)} m² (${percentage})`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// --- FUNÇÕES DE PARSE E CÁLCULO ---
+
 function parseHtmlTable(table) {
     const headers = [];
-    // Pega os cabeçalhos (assume primeira linha)
     table.querySelectorAll('tr')[0].querySelectorAll('th, td').forEach(cell => {
         headers.push(cell.innerText.trim());
     });
@@ -98,14 +224,13 @@ function parseHtmlTable(table) {
     const data = [];
     const rows = table.querySelectorAll('tr');
 
-    // Itera sobre as linhas de dados (começa de i=1 para pular cabeçalho)
     for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         const cells = row.querySelectorAll('td');
         if (cells.length === 0) continue;
 
         const rowData = {};
-        let isTotalRow = false; // Flag para ignorar a linha "Total"
+        let isTotalRow = false;
 
         headers.forEach((header, index) => {
             const cell = cells[index];
@@ -114,21 +239,19 @@ function parseHtmlTable(table) {
             const cellText = cell.innerText.trim();
 
             if (index === 0) {
-                // Primeira coluna (Setor) é texto
                 rowData[header] = cellText;
                 if (cellText.toLowerCase() === 'total') {
                     isTotalRow = true;
                 }
             } else {
-                // Outras colunas são números
-                // Remove ',' (milhar) e usa '.' como decimal
+                // Mantém lógica de remoção de vírgula para processar input (assume padrão US ou 'clean')
+                // Se o input mudar para padrão BR (1.000,00), esta lógica de parse precisaria de ajuste.
+                // Assumindo que o input é o mesmo, apenas o output muda.
                 const numericValue = cellText.replace(/,/g, ''); 
-                
                 rowData[header] = parseFloat(numericValue) || 0;
             }
         });
 
-        // Só adiciona a linha se NÃO for a linha de "Total"
         if (!isTotalRow) {
             data.push(rowData);
         }
@@ -136,16 +259,14 @@ function parseHtmlTable(table) {
     return { headers, data };
 }
 
-// Função para calcular os totais
 function analyzeProductionData(data) {
     let grandTotalManha = 0;
     let grandTotalTarde = 0;
     let grandTotalForaHorario = 0;
     let grandTotalNoite = 0;
-    let grandTotalProduction = 0; // Para calcular a %
+    let grandTotalProduction = 0;
     const sectorBreakdown = [];
 
-    // Cabeçalhos que não são de produção por período
     const nonProductionPeriodHeaders = ['setor', 'total'];
 
     data.forEach(row => {
@@ -153,20 +274,17 @@ function analyzeProductionData(data) {
         let tarde = 0;
         let foraHorario = 0;
         let noite = 0;
-        const setor = row[Object.keys(row)[0]]; // Pega o nome do setor
+        const setor = row[Object.keys(row)[0]];
 
         Object.keys(row).forEach(header => {
             const headerClean = header.toLowerCase();
-            // Pula se for "Setor" ou "Total"
             if (nonProductionPeriodHeaders.includes(headerClean)) return; 
             
-            // Extrai a hora
             const hour = parseInt(header.replace('h', ''));
-            if (isNaN(hour)) return; // Pula se não for uma hora (ex: "Total")
+            if (isNaN(hour)) return;
 
             const value = row[header];
 
-            // Classifica a hora
             if (hour >= 7 && hour <= 12) {
                 manha += value;
             } else if (hour >= 13 && hour <= 16) {
@@ -178,30 +296,25 @@ function analyzeProductionData(data) {
             }
         });
         
-        // Pega o total do setor (da coluna 'Total')
         const totalSetor = row['Total'] || 0;
         grandTotalProduction += totalSetor;
 
-        // Adiciona totais do setor
         sectorBreakdown.push({ setor, manha, tarde, foraHorario, noite, totalSetor });
 
-        // Adiciona aos totais gerais
         grandTotalManha += manha;
         grandTotalTarde += tarde;
         grandTotalForaHorario += foraHorario;
         grandTotalNoite += noite;
     });
 
-    // Retorna o total geral para cálculo da %
     return { grandTotalManha, grandTotalTarde, grandTotalForaHorario, grandTotalNoite, grandTotalProduction, sectorBreakdown }; 
 }
 
 // --- FUNÇÕES DE EXIBIÇÃO ---
 
-// Nova função para popular a tabela de detalhes
 function displaySectorTable(sectorBreakdown) {
     const tbody = document.getElementById('sectorTableBody');
-    tbody.innerHTML = ''; // Limpa tabela
+    tbody.innerHTML = ''; 
 
     sectorBreakdown.forEach(item => {
         const tr = document.createElement('tr');
@@ -209,9 +322,8 @@ function displaySectorTable(sectorBreakdown) {
         
         const totalSetor = item.totalSetor || 0;
 
-        // Cálculos de Média e Porcentagem por período
         const avgManha = (periodDurations.manha > 0) ? (item.manha / periodDurations.manha) : 0;
-        const pctManha = (totalSetor > 0) ? (item.manha / totalSetor) : 0; // valor de 0 a 1
+        const pctManha = (totalSetor > 0) ? (item.manha / totalSetor) : 0;
 
         const avgTarde = (periodDurations.tarde > 0) ? (item.tarde / periodDurations.tarde) : 0;
         const pctTarde = (totalSetor > 0) ? (item.tarde / totalSetor) : 0;
@@ -224,7 +336,6 @@ function displaySectorTable(sectorBreakdown) {
         
         tr.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.setor}</td>
-            
             <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 bg-gray-100">${formatter.format(totalSetor)}</td>
 
             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700">${formatter.format(item.manha)}</td>
@@ -247,17 +358,15 @@ function displaySectorTable(sectorBreakdown) {
     });
 }
 
-// Função para desenhar o gráfico (agrupado)
 function displayProductionChart(sectorBreakdown) {
     const ctx = document.getElementById('productionChart').getContext('2d');
     
-    const labels = sectorBreakdown.map(item => item.setor); // Nomes dos setores
+    const labels = sectorBreakdown.map(item => item.setor);
     const manhaData = sectorBreakdown.map(item => item.manha);
     const tardeData = sectorBreakdown.map(item => item.tarde);
     const foraHorarioData = sectorBreakdown.map(item => item.foraHorario);
     const noiteData = sectorBreakdown.map(item => item.noite);
 
-    // Destrói gráfico antigo, se existir
     if (myChart) {
         myChart.destroy();
     }
@@ -267,52 +376,27 @@ function displayProductionChart(sectorBreakdown) {
         data: {
             labels: labels,
             datasets: [
-                {
-                    label: 'Manhã (7h-12h)',
-                    data: manhaData,
-                    backgroundColor: 'rgba(54, 162, 235, 0.6)', // Azul
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1
-                },
-                {
-                    label: 'Tarde (13h-16h)',
-                    data: tardeData,
-                    backgroundColor: 'rgba(75, 192, 192, 0.6)', // Verde
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1
-                },
-                {
-                    label: 'Fora Horário (17h-21h)',
-                    data: foraHorarioData,
-                    backgroundColor: 'rgba(255, 206, 86, 0.6)', // Amarelo
-                    borderColor: 'rgba(255, 206, 86, 1)',
-                    borderWidth: 1
-                },
-                {
-                    label: 'Noite (22h-6h)',
-                    data: noiteData,
-                    backgroundColor: 'rgba(75, 0, 130, 0.6)', // Indigo/Roxo
-                    borderColor: 'rgba(75, 0, 130, 1)',
-                    borderWidth: 1
-                }
+                { label: 'Manhã', data: manhaData, backgroundColor: 'rgba(54, 162, 235, 0.6)', borderWidth: 1 },
+                { label: 'Tarde', data: tardeData, backgroundColor: 'rgba(75, 192, 192, 0.6)', borderWidth: 1 },
+                { label: 'Fora Horário', data: foraHorarioData, backgroundColor: 'rgba(255, 206, 86, 0.6)', borderWidth: 1 },
+                { label: 'Noite', data: noiteData, backgroundColor: 'rgba(75, 0, 130, 0.6)', borderWidth: 1 }
             ]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
-            scales: {
-                y: {
+            scales: { 
+                y: { 
                     beginAtZero: true,
                     ticks: {
                         callback: function(value) {
-                            return formatter.format(value);
+                            return formatter.format(value); // Usa formato BR no eixo
                         }
-                    }
-                }
+                    } 
+                } 
             },
             plugins: {
-                legend: {
-                    display: true
+                datalabels: {
+                    display: false
                 },
                 tooltip: {
                     callbacks: {
@@ -322,7 +406,8 @@ function displayProductionChart(sectorBreakdown) {
                                 label += ': ';
                             }
                             if (context.parsed.y !== null) {
-                                label += formatter.format(context.parsed.y);
+                                // Adiciona unidade m²
+                                label += formatter.format(context.parsed.y) + ' m²';
                             }
                             return label;
                         }
@@ -333,70 +418,46 @@ function displayProductionChart(sectorBreakdown) {
     });
 }
 
-// Popula o <div> com checkboxes
-function populateSectorCheckboxes(data) {
+function populateSectorCheckboxes(data, defaultIndex) {
     const container = document.getElementById('sectorCheckboxContainer');
-    container.innerHTML = ''; // Limpa opções antigas
+    container.innerHTML = ''; 
 
     data.forEach((row, index) => {
-        const sectorName = row[Object.keys(row)[0]]; // Pega o nome do setor (primeira coluna)
-        
-        // Cria o HTML para o checkbox e a label
+        const sectorName = row[Object.keys(row)[0]];
+        const isChecked = (index === defaultIndex) ? 'checked' : '';
+
         const checkboxHTML = `
             <div class="flex items-center p-1 hover:bg-gray-100 rounded">
                 <input type="checkbox" 
                        id="sector-cb-${index}" 
                        value="${sectorName}" 
                        class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                       ${index === 0 ? 'checked' : ''}> <label for="sector-cb-${index}" class="ml-2 block text-sm text-gray-900">${sectorName}</label>
+                       ${isChecked}> 
+                <label for="sector-cb-${index}" class="ml-2 block text-sm text-gray-900">${sectorName}</label>
             </div>
         `;
         container.insertAdjacentHTML('beforeend', checkboxHTML);
     });
 
-    // Adiciona o event listener ao container PAI
     container.addEventListener('change', () => {
         const selectedSectors = [];
-        // Encontra todos os checkboxes marcados DENTRO do container
         container.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
             selectedSectors.push(checkbox.value);
         });
         displayHourlyChart(selectedSectors);
     });
-
 }
 
-// Desenha o gráfico de linha por hora para MÚLTIPLOS setores
 function displayHourlyChart(selectedSectorNamesArray) {
     const ctx = document.getElementById('hourlyChart').getContext('2d');
     const { headers, data } = parsedDataCache;
 
-    // Define um pool de cores para os gráficos
-    const chartColors = [
-        'rgba(239, 68, 68, 1)',   // Red
-        'rgba(54, 162, 235, 1)',  // Blue
-        'rgba(75, 192, 192, 1)',  // Green
-        'rgba(255, 206, 86, 1)',  // Yellow
-        'rgba(139, 92, 246, 1)',  // Indigo
-        'rgba(255, 159, 64, 1)',  // Orange
-        'rgba(153, 102, 255, 1)', // Purple
-        'rgba(255, 99, 132, 1)'   // Pink
-    ];
-    const chartBgColors = [
-        'rgba(239, 68, 68, 0.1)',
-        'rgba(54, 162, 235, 0.1)',
-        'rgba(75, 192, 192, 0.1)',
-        'rgba(255, 206, 86, 0.1)',
-        'rgba(139, 92, 246, 0.1)',
-        'rgba(255, 159, 64, 0.1)',
-        'rgba(153, 102, 255, 0.1)',
-        'rgba(255, 99, 132, 0.1)'
-    ];
+    const chartColors = ['rgba(239, 68, 68, 1)', 'rgba(54, 162, 235, 1)', 'rgba(75, 192, 192, 1)', 'rgba(255, 206, 86, 1)', 'rgba(139, 92, 246, 1)'];
+    const chartBgColors = ['rgba(239, 68, 68, 0.1)', 'rgba(54, 162, 235, 0.1)', 'rgba(75, 192, 192, 0.1)', 'rgba(255, 206, 86, 0.1)', 'rgba(139, 92, 246, 0.1)'];
 
     const chartLabels = [];
     const datasets = [];
 
-    // 1. Pega os cabeçalhos das horas (ex: "0h", "1h"...)
     headers.forEach(header => {
         const hour = parseInt(header.replace('h', ''));
         if (!isNaN(hour) && hour >= 0 && hour <= 23) {
@@ -404,60 +465,50 @@ function displayHourlyChart(selectedSectorNamesArray) {
         }
     });
 
-    // 2. Cria um dataset para CADA setor selecionado
     selectedSectorNamesArray.forEach((sectorName, index) => {
-        // Encontra os dados do setor selecionado
         const sectorData = data.find(row => row[Object.keys(row)[0]] === sectorName);
-        if (!sectorData) return; // Pula se não encontrar
+        if (!sectorData) return; 
 
         const chartDataPoints = [];
-
-        // Pega os dados de produção para cada hora
         chartLabels.forEach(label => {
             chartDataPoints.push(sectorData[label] || 0);
         });
 
-        // Usa o index para pegar uma cor do pool (dando a volta se acabar)
         const colorIndex = index % chartColors.length;
 
-        // Adiciona o dataset para este setor
         datasets.push({
-            label: `Produção de ${sectorName}`,
+            label: `${sectorName}`,
             data: chartDataPoints,
             borderColor: chartColors[colorIndex],
             backgroundColor: chartBgColors[colorIndex],
             fill: true,
-            tension: 0.1 // Suaviza a linha
+            tension: 0.1
         });
     });
 
-    // Destrói gráfico antigo, se existir
     if (hourlyChartInstance) {
         hourlyChartInstance.destroy();
     }
 
     hourlyChartInstance = new Chart(ctx, {
         type: 'line',
-        data: {
-            labels: chartLabels,
-            datasets: datasets
-        },
+        data: { labels: chartLabels, datasets: datasets },
         options: {
             responsive: true,
             maintainAspectRatio: true,
-            scales: {
-                y: {
+            scales: { 
+                y: { 
                     beginAtZero: true,
                     ticks: {
                         callback: function(value) {
                             return formatter.format(value);
                         }
                     }
-                }
+                } 
             },
             plugins: {
-                legend: {
-                    display: true 
+                datalabels: {
+                    display: false
                 },
                 tooltip: {
                     callbacks: {
@@ -467,7 +518,7 @@ function displayHourlyChart(selectedSectorNamesArray) {
                                 label += ': ';
                             }
                             if (context.parsed.y !== null) {
-                                label += formatter.format(context.parsed.y);
+                                label += formatter.format(context.parsed.y) + ' m²';
                             }
                             return label;
                         }
@@ -478,7 +529,6 @@ function displayHourlyChart(selectedSectorNamesArray) {
     });
 }
 
-// Função para exibir mensagens de status
 function showMessage(message, type = "info") {
     const statusMessage = document.getElementById('statusMessage');
     statusMessage.textContent = message;
