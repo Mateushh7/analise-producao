@@ -32,6 +32,19 @@ const periodDurations = {
 let parsedDataCache = {};
 let analysisResultsCache = {};
 
+// --- BOTÃO LIMPAR ---
+document.getElementById('clearButton').addEventListener('click', () => {
+    const pasteBox = document.getElementById('pasteBox');
+    const statusMessage = document.getElementById('statusMessage');
+    
+    // Limpa o conteúdo
+    pasteBox.innerHTML = '';
+    // Limpa mensagens de status
+    statusMessage.textContent = '';
+    // Foca na caixa para o usuário colar imediatamente
+    pasteBox.focus();
+});
+
 // BOTÃO "PROCESSAR DADOS"
 document.getElementById('extractButton').addEventListener('click', () => {
     const pasteBox = document.getElementById('pasteBox');
@@ -244,9 +257,7 @@ function parseHtmlTable(table) {
                     isTotalRow = true;
                 }
             } else {
-                // Mantém lógica de remoção de vírgula para processar input (assume padrão US ou 'clean')
-                // Se o input mudar para padrão BR (1.000,00), esta lógica de parse precisaria de ajuste.
-                // Assumindo que o input é o mesmo, apenas o output muda.
+                // Remove vírgula para processamento interno (assumindo input US ou 'clean')
                 const numericValue = cellText.replace(/,/g, ''); 
                 rowData[header] = parseFloat(numericValue) || 0;
             }
@@ -336,19 +347,19 @@ function displaySectorTable(sectorBreakdown) {
         
         tr.innerHTML = `
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.setor}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 bg-gray-100">${formatter.format(totalSetor)}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 bg-gray-100 border-r border-gray-200">${formatter.format(totalSetor)}</td>
 
             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700">${formatter.format(item.manha)}</td>
             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${formatter.format(avgManha)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-blue-700 font-medium">${formatterPct.format(pctManha)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-blue-700 font-medium border-r border-blue-50">${formatterPct.format(pctManha)}</td>
             
             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700">${formatter.format(item.tarde)}</td>
             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${formatter.format(avgTarde)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-green-700 font-medium">${formatterPct.format(pctTarde)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-green-700 font-medium border-r border-green-50">${formatterPct.format(pctTarde)}</td>
             
             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700">${formatter.format(item.foraHorario)}</td>
             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${formatter.format(avgForaHorario)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-yellow-700 font-medium">${formatterPct.format(pctForaHorario)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-yellow-700 font-medium border-r border-yellow-50">${formatterPct.format(pctForaHorario)}</td>
             
             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700">${formatter.format(item.noite)}</td>
             <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${formatter.format(avgNoite)}</td>
@@ -384,6 +395,7 @@ function displayProductionChart(sectorBreakdown) {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false, // Permite altura customizada
             scales: { 
                 y: { 
                     beginAtZero: true,
@@ -406,7 +418,6 @@ function displayProductionChart(sectorBreakdown) {
                                 label += ': ';
                             }
                             if (context.parsed.y !== null) {
-                                // Adiciona unidade m²
                                 label += formatter.format(context.parsed.y) + ' m²';
                             }
                             return label;
@@ -427,13 +438,13 @@ function populateSectorCheckboxes(data, defaultIndex) {
         const isChecked = (index === defaultIndex) ? 'checked' : '';
 
         const checkboxHTML = `
-            <div class="flex items-center p-1 hover:bg-gray-100 rounded">
+            <div class="flex items-center p-2 hover:bg-white rounded transition-colors cursor-pointer">
                 <input type="checkbox" 
                        id="sector-cb-${index}" 
                        value="${sectorName}" 
-                       class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                       class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                        ${isChecked}> 
-                <label for="sector-cb-${index}" class="ml-2 block text-sm text-gray-900">${sectorName}</label>
+                <label for="sector-cb-${index}" class="ml-2 block text-sm text-gray-700 cursor-pointer select-none">${sectorName}</label>
             </div>
         `;
         container.insertAdjacentHTML('beforeend', checkboxHTML);
@@ -495,7 +506,7 @@ function displayHourlyChart(selectedSectorNamesArray) {
         data: { labels: chartLabels, datasets: datasets },
         options: {
             responsive: true,
-            maintainAspectRatio: true,
+            maintainAspectRatio: false, // Permite altura customizada
             scales: { 
                 y: { 
                     beginAtZero: true,

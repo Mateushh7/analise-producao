@@ -10,148 +10,218 @@
     
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center font-sans p-4">
+<body class="bg-gray-50 min-h-screen font-sans">
 
-    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-6xl relative"> 
+    <div class="container mx-auto px-4 py-8 max-w-6xl"> 
         
-        <div id="headerControls" class="hidden flex justify-between items-center mb-6 border-b pb-4">
-            <h1 class="text-xl font-bold text-blue-700">Relatório de Produção</h1>
-            <button id="showInputBtn" class="text-sm text-gray-500 hover:text-blue-600 flex items-center transition-colors">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div id="headerControls" class="hidden bg-white p-4 rounded-lg shadow-sm mb-6 flex justify-between items-center border border-gray-200">
+            <div class="flex items-center">
+                <div class="bg-blue-100 p-2 rounded-full mr-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </div>
+                <h1 class="text-xl font-bold text-gray-800">Relatório de Produção</h1>
+            </div>
+            <button id="showInputBtn" class="bg-white border border-gray-300 text-gray-600 hover:text-blue-600 hover:border-blue-300 font-medium py-2 px-4 rounded-lg flex items-center transition-all shadow-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                Editar Dados / Nova Consulta
+                Nova Consulta
             </button>
         </div>
 
-        <div id="inputSection">
-            <h1 class="text-2xl font-bold text-center text-blue-700 mb-6">Análise produção</h1>
-
-            <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 p-4 rounded-md mb-6">
-                <h3 class="font-bold mb-2">Como usar:</h3>
-                <ol class="list-decimal list-inside space-y-1">
-                    <li>Na tela "Produção hora em hora", selecione a tabela inteira com o mouse.</li>
-                    <li>Copie a tabela (use o atalho <code class="font-mono bg-blue-100 px-1 rounded">Ctrl+C</code>).</li>
-                    <li>Clique na caixa abaixo e cole a tabela (use <code class="font-mono bg-blue-100 px-1 rounded">Ctrl+V</code>).</li>
-                    <li>Clique no botão "Processar Dados".</li>
-                </ol>
-            </div>
-
-            <div id="pasteBox"
-                 contenteditable="true"
-                 class="w-full h-48 p-4 border-2 border-dashed border-gray-300 rounded-lg overflow-y-auto bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                 role="textbox"
-                 aria-multiline="true"
-                 aria-label="Área para colar a tabela">
-            </div>
-
-            <button id="extractButton" class="w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-300 mt-6 shadow-md">
-                Processar Dados
-            </button>
-        </div>
-
-        <div id="statusMessage" class="mt-4 text-center text-sm font-medium"></div>
-
-        <div id="resultsArea" class="mt-8 hidden">
+        <div id="inputSection" class="max-w-4xl mx-auto mt-10">
             
-            <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-8">
-                <h3 class="text-lg font-bold text-gray-700 mb-4">Visão Geral por Setor</h3>
+            <div class="text-center mb-10">
+                <h1 class="text-4xl font-extrabold text-gray-900 tracking-tight mb-2">Análise de Produção</h1>
+                <p class="text-lg text-gray-500">Importe seus dados para gerar dashboards e relatórios detalhados.</p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
+                <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Como Importar os Dados</h3>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3 border border-blue-200">1</div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">Copiar Tabela</p>
+                                <p class="text-sm text-gray-500 mt-1">Selecione e copie (Ctrl+C) a tabela na tela "Produção hora em hora".</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3 border border-blue-200">2</div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">Colar Dados</p>
+                                <p class="text-sm text-gray-500 mt-1">Cole o conteúdo (Ctrl+V) na caixa de texto abaixo.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3 border border-blue-200">3</div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">Processar</p>
+                                <p class="text-sm text-gray-500 mt-1">Clique no botão para gerar os gráficos automaticamente.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-1 rounded-lg shadow-md border border-gray-300 focus-within:ring-4 focus-within:ring-blue-100 focus-within:border-blue-400 transition-all duration-200">
+                <div id="pasteBox"
+                     contenteditable="true"
+                     class="w-full h-64 p-6 overflow-y-auto outline-none text-gray-700 text-sm leading-relaxed"
+                     role="textbox"
+                     aria-multiline="true"
+                     aria-label="Área para colar a tabela">
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-4 mt-6">
+                <button id="extractButton" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-colors duration-200 flex items-center justify-center text-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Processar Dados
+                </button>
+                
+                <button id="clearButton" class="sm:w-auto bg-white border border-gray-300 hover:bg-red-50 hover:text-red-600 hover:border-red-300 text-gray-700 font-semibold py-3 px-6 rounded-lg shadow-sm transition-colors duration-200 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Limpar Campo
+                </button>
+            </div>
+
+            <div id="statusMessage" class="mt-4 text-center text-sm font-medium"></div>
+        </div>
+
+        <div id="resultsArea" class="mt-8 hidden space-y-8">
+            
+            <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+                <h3 class="text-lg font-bold text-gray-700 mb-4 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+                    </svg>
+                    Visão Geral por Setor
+                </h3>
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                     <div class="flex flex-col space-y-6">
                         <div>
-                            <label for="overviewSectorSelect" class="block text-sm font-medium text-gray-700 mb-2">Selecione o Setor:</label>
-                            <select id="overviewSectorSelect" class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border">
-                                </select>
+                            <label for="overviewSectorSelect" class="block text-sm font-medium text-gray-700 mb-2">Setor:</label>
+                            <div class="relative">
+                                <select id="overviewSectorSelect" class="block w-full pl-3 pr-10 py-3 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md border shadow-sm">
+                                    </select>
+                            </div>
                         </div>
 
-                        <div class="bg-blue-50 rounded-lg p-6 text-center border border-blue-100">
-                            <p class="text-sm font-medium text-blue-600 uppercase tracking-wider">Média Geral do Dia (m²/h)</p>
-                            <div id="overviewBigNumber" class="mt-2 text-5xl font-extrabold text-blue-900">
+                        <div class="bg-blue-50 rounded-lg p-6 text-center border border-blue-100 shadow-sm">
+                            <p class="text-sm font-bold text-blue-600 uppercase tracking-wider">Média Geral do Dia (m²/h)</p>
+                            <div id="overviewBigNumber" class="mt-2 text-5xl font-extrabold text-blue-900 tracking-tight">
                                 0,00
                             </div>
-                            <p class="text-xs text-gray-500 mt-2">Média por hora (Base 22.75h)</p>
+                            <p class="text-xs text-blue-400 mt-2 font-medium">Base de cálculo: 22.75 horas</p>
                         </div>
 
                         <div>
                             <p class="text-sm font-semibold text-gray-700 mb-3">Médias por Período (m²/h):</p>
                             <div class="grid grid-cols-2 gap-3">
-                                <div class="bg-gray-50 p-3 rounded border border-gray-200 text-center">
-                                    <p class="text-xs text-gray-500 uppercase">Manhã</p>
+                                <div class="bg-white p-3 rounded border border-gray-200 text-center shadow-sm">
+                                    <p class="text-xs text-gray-500 uppercase font-semibold">Manhã</p>
                                     <p id="avgManhaDisplay" class="text-lg font-bold text-blue-600">0,00</p>
                                 </div>
-                                <div class="bg-gray-50 p-3 rounded border border-gray-200 text-center">
-                                    <p class="text-xs text-gray-500 uppercase">Tarde</p>
+                                <div class="bg-white p-3 rounded border border-gray-200 text-center shadow-sm">
+                                    <p class="text-xs text-gray-500 uppercase font-semibold">Tarde</p>
                                     <p id="avgTardeDisplay" class="text-lg font-bold text-green-600">0,00</p>
                                 </div>
-                                <div class="bg-gray-50 p-3 rounded border border-gray-200 text-center">
-                                    <p class="text-xs text-gray-500 uppercase">Fora Horário</p>
+                                <div class="bg-white p-3 rounded border border-gray-200 text-center shadow-sm">
+                                    <p class="text-xs text-gray-500 uppercase font-semibold">Fora Horário</p>
                                     <p id="avgForaDisplay" class="text-lg font-bold text-yellow-600">0,00</p>
                                 </div>
-                                <div class="bg-gray-50 p-3 rounded border border-gray-200 text-center">
-                                    <p class="text-xs text-gray-500 uppercase">Noite</p>
+                                <div class="bg-white p-3 rounded border border-gray-200 text-center shadow-sm">
+                                    <p class="text-xs text-gray-500 uppercase font-semibold">Noite</p>
                                     <p id="avgNoiteDisplay" class="text-lg font-bold text-indigo-600">0,00</p>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="relative h-80 w-full flex justify-center items-center">
+                    <div class="relative h-80 w-full flex justify-center items-center bg-gray-50 rounded-xl border border-gray-100 p-4">
                         <canvas id="overviewPieChart"></canvas>
                     </div>
                 </div>
             </div>
-            <h2 class="text-xl font-semibold text-gray-800 mb-1 mt-8 border-t pt-6">Detalhes por Setor</h2>
-            <p class="text-sm text-gray-500 mb-4 italic">
-                * Divisores para cálculo da média horária: Manhã (4,75), Tarde (4), Fora Horário (5), Noite (9).
-            </p>
 
-            <div class="w-full overflow-x-auto bg-gray-50 p-4 rounded-lg shadow-inner">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-100">
-                        <tr>
-                            <th rowspan="2" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider align-middle">Setor</th>
-                            <th rowspan="2" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider align-middle bg-gray-200">Total Dia (m²)</th>
-                            <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-blue-700 uppercase tracking-wider bg-blue-50">Manhã (7h-12h)</th>
-                            <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-green-700 uppercase tracking-wider bg-green-50">Tarde (13h-16h)</th>
-                            <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-yellow-700 uppercase tracking-wider bg-yellow-50">Fora Horário (17h-21h)</th>
-                            <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-indigo-700 uppercase tracking-wider bg-indigo-50">Noite (22h-6h)</th>
-                        </tr>
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">Total (m²)</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">Média/h (m²)</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">% do Setor</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50">Total (m²)</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50">Média/h (m²)</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50">% do Setor</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50">Total (m²)</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50">Média/h (m²)</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50">% do Setor</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-indigo-50">Total (m²)</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-indigo-50">Média/h (m²)</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-indigo-50">% do Setor</th>
-                        </tr>
-                    </thead>
-                    <tbody id="sectorTableBody" class="bg-white divide-y divide-gray-200">
+            <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gray-50">
+                    <h2 class="text-lg font-bold text-gray-700">Detalhes por Setor</h2>
+                    <p class="text-xs text-gray-500 mt-1 italic">* Divisores para média: Manhã (4,75), Tarde (4), Fora Horário (5), Noite (9).</p>
+                </div>
+                
+                <div class="w-full overflow-x-auto p-4">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th rowspan="2" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider align-middle">Setor</th>
+                                <th rowspan="2" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider align-middle bg-gray-200 border-r border-gray-300">Total Dia (m²)</th>
+                                <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-blue-700 uppercase tracking-wider bg-blue-50 border-r border-blue-100">Manhã (7h-12h)</th>
+                                <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-green-700 uppercase tracking-wider bg-green-50 border-r border-green-100">Tarde (13h-16h)</th>
+                                <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-yellow-700 uppercase tracking-wider bg-yellow-50 border-r border-yellow-100">Fora Horário (17h-21h)</th>
+                                <th colspan="3" class="px-4 py-3 text-center text-xs font-medium text-indigo-700 uppercase tracking-wider bg-indigo-50">Noite (22h-6h)</th>
+                            </tr>
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">Total</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">Média/h</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-r border-blue-100">% Setor</th>
+                                
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50">Total</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50">Média/h</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50 border-r border-green-100">% Setor</th>
+                                
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50">Total</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50">Média/h</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50 border-r border-yellow-100">% Setor</th>
+                                
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-indigo-50">Total</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-indigo-50">Média/h</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-indigo-50">% Setor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sectorTableBody" class="bg-white divide-y divide-gray-200">
                         </tbody>
-                </table>
+                    </table>
+                </div>
             </div>
 
-            <h2 class="text-xl font-semibold text-gray-800 mb-4 mt-8">Produção por Período (Gráfico)</h2>
-            <div class="bg-gray-50 p-4 rounded-lg shadow-inner">
-                <canvas id="productionChart"></canvas>
+            <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+                <h2 class="text-lg font-bold text-gray-700 mb-6">Produção por Período (Gráfico Comparativo)</h2>
+                <div class="relative h-96">
+                    <canvas id="productionChart"></canvas>
+                </div>
             </div>
 
-            <h2 class="text-2xl font-semibold text-gray-800 mb-4 border-b pb-2 mt-12">Análise por Setor (Produção/Hora)</h2>
-            
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">Selecione os Setores para analisar:</label>
-                <div id="sectorCheckboxContainer" class="w-full max-h-40 overflow-y-auto p-3 border border-gray-300 rounded-lg bg-gray-50 shadow-sm space-y-2">
+            <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-gray-100 pb-4">
+                    <h2 class="text-lg font-bold text-gray-700">Evolução por Hora</h2>
+                    <span class="text-sm text-gray-500">Selecione os setores abaixo para comparar:</span>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="lg:col-span-1">
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Setores Disponíveis</label>
+                        <div id="sectorCheckboxContainer" class="w-full h-64 overflow-y-auto p-2 border border-gray-200 rounded-lg bg-gray-50 space-y-1">
+                        </div>
                     </div>
-            </div>
-
-            <div class="bg-gray-50 p-4 rounded-lg shadow-inner">
-                <canvas id="hourlyChart"></canvas>
+                    <div class="lg:col-span-3">
+                        <div class="relative h-80">
+                            <canvas id="hourlyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
