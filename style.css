@@ -1,0 +1,6 @@
+/* Estilos personalizados para o editor de colagem */
+#pasteBox:empty::before {
+    content: "Clique aqui e cole a tabela (Ctrl+V)...";
+    color: #9ca3af; /* text-gray-400 */
+    font-style: italic;
+}
