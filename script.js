@@ -144,17 +144,13 @@ function updateOverviewData(index, sectorBreakdown) {
     const item = sectorBreakdown[index];
     if (!item) return;
 
-    // 1. Cálculos de Médias
-    const totalHours = periodDurations.manha + periodDurations.tarde + periodDurations.foraHorario + periodDurations.noite;
-    const globalAverage = item.totalSetor / totalHours;
-
+    // 1. Cálculos de Médias (REMOVIDO Média Geral)
     const avgManha = periodDurations.manha > 0 ? item.manha / periodDurations.manha : 0;
     const avgTarde = periodDurations.tarde > 0 ? item.tarde / periodDurations.tarde : 0;
     const avgFora = periodDurations.foraHorario > 0 ? item.foraHorario / periodDurations.foraHorario : 0;
     const avgNoite = periodDurations.noite > 0 ? item.noite / periodDurations.noite : 0;
 
-    // 2. Atualiza HTML dos números
-    document.getElementById('overviewBigNumber').textContent = formatter.format(globalAverage);
+    // 2. Atualiza HTML dos números (APENAS POR PERÍODO)
     document.getElementById('avgManhaDisplay').textContent = formatter.format(avgManha);
     document.getElementById('avgTardeDisplay').textContent = formatter.format(avgTarde);
     document.getElementById('avgForaDisplay').textContent = formatter.format(avgFora);
