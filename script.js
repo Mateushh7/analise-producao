@@ -232,7 +232,7 @@ document.getElementById('downloadExcelBtn').addEventListener('click', () => {
     });
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
-    XLSX.utils.book_append_sheet(wb, ws, "Dados");
+    XLSX.utils.book_append_sheet(wb, ws, currentSelectedDate.replace(/\//g, '-'));
     const fileNameDate = currentSelectedDate.replace(/\//g, '-');
     XLSX.writeFile(wb, `Analise_${fileNameDate}.xlsx`);
 });
