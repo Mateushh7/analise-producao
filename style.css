@@ -49,6 +49,20 @@
 
 #detailsTable thead th { box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
+/* Estilo para legenda do gráfico de pizza - texto riscado quando oculto */
+#overviewPieChart ~ canvas + div ul li[style*="opacity: 0.5"],
+#overviewPieChart ~ canvas + div ul li[style*="opacity:0.5"],
+canvas[id="overviewPieChart"] ~ div ul li[style*="opacity: 0.5"],
+canvas[id="overviewPieChart"] ~ div ul li[style*="opacity:0.5"] {
+    text-decoration: line-through !important;
+}
+
+/* Alternativa: aplicar riscado em itens ocultos da legenda do Chart.js */
+.chartjs-legend li[style*="opacity: 0.5"],
+.chartjs-legend li[style*="opacity:0.5"] {
+    text-decoration: line-through !important;
+}
+
 /* --- CONFIGURAÇÕES DE IMPRESSÃO --- */
 @media print {
     /* REMOVIDO 'nav' desta lista para que o cabeçalho imprima */

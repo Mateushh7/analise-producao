@@ -415,23 +415,70 @@ function updateOverviewData(index, sectorBreakdown) {
                                     const value = data.datasets[0].data[i];
                                     const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
                                     const percentage = total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+                                    const isHidden = isNaN(data.datasets[0].data[i]) || meta.data[i].hidden;
                                     return {
                                         text: `${label}: ${formatter.format(value)} m² (${percentage})`,
                                         fillStyle: style.backgroundColor,
                                         strokeStyle: style.borderColor,
                                         lineWidth: style.borderWidth,
-                                        hidden: isNaN(data.datasets[0].data[i]) || meta.data[i].hidden,
+                                        hidden: isHidden,
                                         index: i
                                     };
                                 });
                             }
                             return [];
                         }
-                    } 
+                    },
+                    onClick: function(e, legendItem, legend) {
+                        const index = legendItem.index;
+                        const chart = legend.chart;
+                        const meta = chart.getDatasetMeta(0);
+                        
+                        // Toggle do estado oculto
+                        meta.data[index].hidden = !meta.data[index].hidden;
+                        chart.update();
+                        
+                        // Aplica estilo riscado após atualização
+                        setTimeout(() => {
+                            const legendElement = chart.legend.legendItems;
+                            if (legendElement && legendElement[index]) {
+                                const legendLi = chart.canvas.parentElement.querySelectorAll('ul li')[index];
+                                if (legendLi) {
+                                    if (meta.data[index].hidden) {
+                                        legendLi.style.textDecoration = 'line-through';
+                                    } else {
+                                        legendLi.style.textDecoration = 'none';
+                                    }
+                                }
+                            }
+                        }, 0);
+                    }
                 },
                 tooltip: { callbacks: { label: function(context) { return ` ${context.label}: ${formatter.format(context.parsed)} m²`; } } }
             }
-        }
+        },
+        plugins: [{
+            id: 'legendStrikethrough',
+            afterUpdate: function(chart) {
+                const legend = chart.legend;
+                if (legend && legend.legendItems) {
+                    const legendContainer = chart.canvas.parentElement;
+                    if (legendContainer) {
+                        const legendItems = legendContainer.querySelectorAll('ul li');
+                        legendItems.forEach((item, index) => {
+                            const meta = chart.getDatasetMeta(0);
+                            if (meta && meta.data[index]) {
+                                if (meta.data[index].hidden) {
+                                    item.style.textDecoration = 'line-through';
+                                } else {
+                                    item.style.textDecoration = 'none';
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }]
     });
 }
 
