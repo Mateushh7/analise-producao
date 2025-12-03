@@ -1,107 +1,167 @@
-// Registra o plugin de DataLabels
+// Configuração Global do Chart.js
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.color = '#64748b'; 
+Chart.defaults.scale.grid.color = '#f1f5f9';
+Chart.defaults.plugins.tooltip.backgroundColor = '#1e293b'; 
+Chart.defaults.plugins.tooltip.padding = 10;
+Chart.defaults.plugins.tooltip.cornerRadius = 6;
+
+// Cores Oficiais
+const brandColors = {
+    manha: '#6DAFB8',      
+    tarde: '#2C6E7A',      
+    noite: '#163A4A',      
+    foraHorario: '#C63832' 
+};
+
 if (typeof ChartDataLabels !== 'undefined') {
     Chart.register(ChartDataLabels);
 }
 
-// Variável global para guardar a instância do gráfico e poder destruí-la
+// Variáveis Globais
 let myChart;
 let hourlyChartInstance;
 let overviewPieChartInstance; 
 let currentSelectedDate = '';
+let rawPasteData = ''; 
 
-// Formatador de números global para 'pt-BR' (usa , como decimal e . como milhar)
-const formatter = new Intl.NumberFormat('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-});
+// Formatadores
+const formatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const formatterPct = new Intl.NumberFormat('pt-BR', { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
-// Formatador de porcentagem para 'pt-BR'
-const formatterPct = new Intl.NumberFormat('pt-BR', {
-    style: 'percent',
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1
-});
-
-// Define a duração (em horas) de cada período (Divisores para média)
-const periodDurations = {
-    manha: 4.75,       
-    tarde: 4,          
-    foraHorario: 7,    
-    noite: 7.61        
-};
+const periodDurations = { manha: 4.75, tarde: 4, foraHorario: 7, noite: 7.61 };
 
 let parsedDataCache = {};
 let analysisResultsCache = {};
 
-// --- BOTÃO LIMPAR ---
-document.getElementById('clearButton').addEventListener('click', () => {
-    const pasteBox = document.getElementById('pasteBox');
-    const statusMessage = document.getElementById('statusMessage');
+// --- EVENT LISTENERS ---
+
+// Listener especial de COLAGEM (Paste)
+const pasteBox = document.getElementById('pasteBox');
+pasteBox.addEventListener('paste', (e) => {
+    e.preventDefault(); 
     
-    // Limpa o conteúdo
-    pasteBox.innerHTML = '';
-    // Limpa mensagens de status
-    statusMessage.textContent = '';
-    // Foca na caixa para o usuário colar imediatamente
-    pasteBox.focus();
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const pastedHtml = clipboardData.getData('text/html');
+    const pastedText = clipboardData.getData('text/plain');
+    
+    const contentToAnalyze = pastedHtml || pastedText;
+
+    if (!contentToAnalyze) {
+        renderPasteState('empty');
+        return;
+    }
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = contentToAnalyze;
+    const table = findTargetTable(tempDiv);
+
+    if (table) {
+        rawPasteData = contentToAnalyze; 
+        renderPasteState('success');
+        showMessage(""); 
+    } else {
+        rawPasteData = '';
+        renderPasteState('error');
+    }
 });
 
-// BOTÃO "PROCESSAR DADOS"
+pasteBox.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) return; 
+    e.preventDefault();
+});
+
+// Funções de Renderização do Estado da Caixa
+function renderPasteState(state) {
+    const box = document.getElementById('pasteBox');
+    
+    if (state === 'success') {
+        // CORRIGIDO: Removido h-full para não forçar altura, w-full para centralizar no align-items: center
+        box.innerHTML = `
+            <div class="w-full flex flex-col items-center justify-center text-center animate-pulse-once">
+                <div class="bg-green-100 text-green-600 rounded-full p-3 mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-800">Dados Recebidos!</h3>
+                <p class="text-sm text-slate-500 mt-1">Tabela identificada corretamente.</p>
+                <p class="text-xs text-brand-medium mt-2 font-medium">Clique em "Gerar Dashboard" para processar.</p>
+            </div>
+        `;
+        box.classList.add('bg-green-50');
+    } else if (state === 'error') {
+        box.innerHTML = `
+            <div class="w-full flex flex-col items-center justify-center text-center">
+                <div class="bg-red-100 text-red-600 rounded-full p-3 mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-800">Tabela não encontrada</h3>
+                <p class="text-sm text-slate-500 mt-1">O conteúdo colado não parece ser o relatório correto.</p>
+                <p class="text-xs text-slate-400 mt-2">Tente copiar novamente usando Ctrl+A na página do sistema.</p>
+            </div>
+        `;
+        box.classList.remove('bg-green-50');
+    } else {
+        box.innerHTML = '';
+        box.classList.remove('bg-green-50');
+    }
+}
+
+
+document.getElementById('clearButton').addEventListener('click', () => {
+    rawPasteData = '';
+    renderPasteState('empty');
+    document.getElementById('statusMessage').textContent = '';
+    document.getElementById('pasteBox').focus();
+});
+
 document.getElementById('extractButton').addEventListener('click', () => {
-    const pasteBox = document.getElementById('pasteBox');
     const dateInput = document.getElementById('reportDate');
-    const statusMessage = document.getElementById('statusMessage');
     const resultsArea = document.getElementById('resultsArea');
     const inputSection = document.getElementById('inputSection');
     const headerControls = document.getElementById('headerControls');
     const displayDateSpan = document.getElementById('displayDate');
 
     resultsArea.classList.add('hidden');
-    statusMessage.textContent = ''; 
+    showMessage(""); 
 
-    // Validação da Data
     if (!dateInput.value) {
-        showMessage("Por favor, selecione uma data antes de processar.", "error");
+        showMessage("Por favor, selecione a Data de Referência.", "error");
         dateInput.focus();
         return;
     }
     
-    // Formata data para exibir (pt-BR)
     const dateObj = new Date(dateInput.value);
-    // Ajuste de fuso horário simples para exibir a data correta
     const userTimezoneOffset = dateObj.getTimezoneOffset() * 60000;
     const dateAdjusted = new Date(dateObj.getTime() + userTimezoneOffset);
     currentSelectedDate = dateAdjusted.toLocaleDateString('pt-BR');
     displayDateSpan.textContent = currentSelectedDate;
     
-    const pastedHtml = pasteBox.innerHTML;
-    if (!pastedHtml.trim()) {
-        showMessage("A caixa de colagem está vazia. Cole o conteúdo da página primeiro.", "error");
+    if (!rawPasteData) {
+        showMessage("Nenhum dado válido foi colado. Cole a tabela primeiro.", "error");
         return;
     }
 
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = pastedHtml;
+    tempDiv.innerHTML = rawPasteData;
 
-    // 1. Tenta encontrar a tabela correta
     const table = findTargetTable(tempDiv);
-
     if (!table) {
-        showMessage("Não foi possível encontrar a tabela começando com 'Setor'. Verifique se copiou a página correta.", "error");
+        showMessage("Erro inesperado: Tabela perdida. Tente colar novamente.", "error");
         return;
     }
 
     try {
-        // 2. Processa a tabela encontrada
         const parsedData = parseHtmlTable(table);
-        
         if (parsedData.data.length === 0) {
-            showMessage("A tabela foi encontrada, mas não contém dados legíveis.", "error");
+            showMessage("Tabela encontrada, mas sem dados válidos.", "error");
             return;
         }
 
         parsedDataCache = parsedData;
-
         const analysisResults = analyzeProductionData(parsedData.data);
         analysisResultsCache = analysisResults;
 
@@ -109,10 +169,7 @@ document.getElementById('extractButton').addEventListener('click', () => {
         displayProductionChart(analysisResults.sectorBreakdown);
 
         let defaultIndex = 0;
-        // Tenta pegar o segundo item (índice 1) como padrão se houver dados suficientes
-        if (parsedData.data.length >= 2) {
-            defaultIndex = 1; 
-        }
+        if (parsedData.data.length >= 2) defaultIndex = 1; 
 
         initOverviewSection(parsedData.data, analysisResults.sectorBreakdown, defaultIndex);
         populateSectorCheckboxes(parsedData.data, defaultIndex);
@@ -122,121 +179,155 @@ document.getElementById('extractButton').addEventListener('click', () => {
             displayHourlyChart([defaultSectorName]); 
         }
 
-        // SUCESSO: Mostrar resultados e esconder inputs
-        resultsArea.classList.remove('hidden');
         inputSection.classList.add('hidden'); 
+        resultsArea.classList.remove('hidden');
         headerControls.classList.remove('hidden'); 
-        
-        statusMessage.textContent = ''; 
+        window.scrollTo({ top: 0, behavior: 'smooth' });
 
     } catch (error) {
-        console.error("Erro ao analisar dados:", error);
-        showMessage("Erro ao processar os dados. O formato numérico pode estar inconsistente.", "error");
+        console.error(error);
+        showMessage("Erro ao processar dados.", "error");
     }
 });
 
-// BOTÃO EXPORTAR EXCEL
 document.getElementById('downloadExcelBtn').addEventListener('click', () => {
     if (!analysisResultsCache.sectorBreakdown) return;
-
-    // Criação dos dados para o Excel
     const wb = XLSX.utils.book_new();
     
-    // Cabeçalho do Relatório
     const ws_data = [
-        ["Relatório Detalhado por Setor"],
-        ["Data de Referência:", currentSelectedDate],
-        [], // Linha em branco
-        // Cabeçalhos da Tabela
-        [
-            "Setor", 
-            "Total Dia (m²)", 
-            "Manhã Total", "Manhã Média/h", "Manhã %",
-            "Tarde Total", "Tarde Média/h", "Tarde %",
-            "Fora Total", "Fora Média/h", "Fora %",
-            "Noite Total", "Noite Média/h", "Noite %"
-        ]
+        ["Relatório de Produção"],
+        ["Data:", currentSelectedDate],
+        [], 
+        ["Setor", "Total (m²)", "Manhã Total", "Manhã Média", "Manhã %", "Tarde Total", "Tarde Média", "Tarde %", "Fora Total", "Fora Média", "Fora %", "Noite Total", "Noite Média", "Noite %"]
     ];
 
-    // Adiciona linhas de dados
     analysisResultsCache.sectorBreakdown.forEach(item => {
-        const totalSetor = item.totalSetor || 0;
-        
-        // Cálculos
-        const avgManha = periodDurations.manha > 0 ? item.manha / periodDurations.manha : 0;
-        const pctManha = totalSetor > 0 ? item.manha / totalSetor : 0;
-
-        const avgTarde = periodDurations.tarde > 0 ? item.tarde / periodDurations.tarde : 0;
-        const pctTarde = totalSetor > 0 ? item.tarde / totalSetor : 0;
-
-        const avgFora = periodDurations.foraHorario > 0 ? item.foraHorario / periodDurations.foraHorario : 0;
-        const pctFora = totalSetor > 0 ? item.foraHorario / totalSetor : 0;
-
-        const avgNoite = periodDurations.noite > 0 ? item.noite / periodDurations.noite : 0;
-        const pctNoite = totalSetor > 0 ? item.noite / totalSetor : 0;
+        const total = item.totalSetor || 0;
+        const calcAvg = (val, dur) => dur > 0 ? val / dur : 0;
+        const calcPct = (val) => total > 0 ? val / total : 0;
 
         ws_data.push([
-            item.setor,
-            totalSetor,
-            item.manha, avgManha, pctManha,
-            item.tarde, avgTarde, pctTarde,
-            item.foraHorario, avgFora, pctFora,
-            item.noite, avgNoite, pctNoite
+            item.setor, item.totalSetor,
+            item.manha, calcAvg(item.manha, periodDurations.manha), calcPct(item.manha),
+            item.tarde, calcAvg(item.tarde, periodDurations.tarde), calcPct(item.tarde),
+            item.foraHorario, calcAvg(item.foraHorario, periodDurations.foraHorario), calcPct(item.foraHorario),
+            item.noite, calcAvg(item.noite, periodDurations.noite), calcPct(item.noite)
         ]);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
-
-    // Formatação básica (apenas definindo colunas com porcentagem se possível, 
-    // mas SheetJS community version tem limitações de estilo visual)
-    
-    XLSX.utils.book_append_sheet(wb, ws, "Produção");
-    
-    // Nome do arquivo seguro
+    XLSX.utils.book_append_sheet(wb, ws, "Dados");
     const fileNameDate = currentSelectedDate.replace(/\//g, '-');
-    XLSX.writeFile(wb, `Relatorio_Producao_${fileNameDate}.xlsx`);
+    XLSX.writeFile(wb, `Analise_${fileNameDate}.xlsx`);
 });
 
-// --- FUNÇÃO PARA ENCONTRAR TABELA ---
+document.getElementById('showInputBtn').addEventListener('click', () => {
+    document.getElementById('inputSection').classList.remove('hidden');
+    document.getElementById('headerControls').classList.add('hidden');
+    document.getElementById('resultsArea').classList.add('hidden'); 
+    
+    rawPasteData = '';
+    renderPasteState('empty');
+    document.getElementById('reportDate').value = '';
+});
+
+// --- LÓGICA DE DADOS ---
+
 function findTargetTable(container) {
     const tables = container.querySelectorAll('table');
-    
     for (const table of tables) {
         const rows = table.querySelectorAll('tr');
         for (let i = 0; i < rows.length; i++) {
             const firstCell = rows[i].querySelector('th, td');
-            if (firstCell) {
-                const text = firstCell.innerText.replace(/\s+/g, ' ').trim().toLowerCase();
-                if (text.startsWith('setor')) {
-                    return table; 
-                }
+            if (firstCell && firstCell.innerText.trim().toLowerCase().startsWith('setor')) {
+                return table; 
             }
         }
     }
     return null;
 }
 
-// BOTÃO "NOVA CONSULTA"
-document.getElementById('showInputBtn').addEventListener('click', () => {
-    const inputSection = document.getElementById('inputSection');
-    const headerControls = document.getElementById('headerControls');
-    const resultsArea = document.getElementById('resultsArea');
+function parseLocalizedNumber(str) {
+    if (!str) return 0;
+    let clean = str.replace(/[^\d.,-]/g, '').trim(); 
+    if (!clean) return 0;
+    const lastComma = clean.lastIndexOf(',');
+    const lastDot = clean.lastIndexOf('.');
+    if (lastComma > lastDot) clean = clean.replace(/\./g, '').replace(',', '.');  
+    else if (lastDot > lastComma) clean = clean.replace(/,/g, '');  
+    return parseFloat(clean) || 0;
+}
 
-    inputSection.classList.remove('hidden');
-    headerControls.classList.add('hidden');
-    resultsArea.classList.add('hidden'); 
-    
-    // Limpa a data selecionada visualmente
-    document.getElementById('reportDate').value = '';
-});
+function parseHtmlTable(table) {
+    const rows = Array.from(table.querySelectorAll('tr'));
+    const headerRowIndex = rows.findIndex(row => {
+        const cell = row.querySelector('th, td');
+        return cell && cell.innerText.trim().toLowerCase().startsWith('setor');
+    });
 
+    if (headerRowIndex === -1) return { headers: [], data: [] };
 
-// --- FUNÇÕES DA NOVA SEÇÃO DE VISÃO GERAL ---
+    const headers = [];
+    rows[headerRowIndex].querySelectorAll('th, td').forEach(cell => headers.push(cell.innerText.replace(/\n/g, '').trim()));
+
+    const data = [];
+    for (let i = headerRowIndex + 1; i < rows.length; i++) {
+        const cells = rows[i].querySelectorAll('td');
+        if (cells.length < headers.length) continue;
+
+        const rowData = {};
+        let isTotalRow = false;
+        headers.forEach((header, index) => {
+            const cellText = cells[index] ? cells[index].innerText.trim() : '';
+            if (index === 0) {
+                rowData[header] = cellText;
+                if (cellText.toLowerCase() === 'total') isTotalRow = true;
+            } else {
+                rowData[header] = parseLocalizedNumber(cellText);
+            }
+        });
+        if (!isTotalRow) data.push(rowData);
+    }
+    return { headers, data };
+}
+
+function analyzeProductionData(data) {
+    let grandTotalManha = 0, grandTotalTarde = 0, grandTotalFora = 0, grandTotalNoite = 0, grandTotal = 0;
+    const sectorBreakdown = [];
+    const ignoreHeaders = ['setor', 'total'];
+
+    data.forEach(row => {
+        let manha = 0, tarde = 0, fora = 0, noite = 0;
+        const setor = row[Object.keys(row)[0]];
+
+        Object.keys(row).forEach(header => {
+            if (ignoreHeaders.some(h => header.toLowerCase().includes(h))) return;
+            const hourMatch = header.match(/(\d+)/);
+            if (!hourMatch) return;
+            const hour = parseInt(hourMatch[0]);
+            const val = row[header];
+
+            if (hour >= 7 && hour <= 11) manha += val;
+            else if (hour >= 13 && hour <= 16) tarde += val;
+            else if (hour === 12 || (hour >= 17 && hour <= 21) || hour === 2) fora += val;
+            else noite += val;
+        });
+
+        const totalSetor = row[Object.keys(row).find(k => k.toLowerCase() === 'total')] || (manha + tarde + fora + noite);
+        grandTotal += totalSetor;
+        grandTotalManha += manha; grandTotalTarde += tarde; grandTotalFora += fora; grandTotalNoite += noite;
+
+        sectorBreakdown.push({ setor, manha, tarde, foraHorario: fora, noite, totalSetor });
+    });
+
+    return { grandTotalManha, grandTotalTarde, grandTotalFora, grandTotalNoite, grandTotal, sectorBreakdown }; 
+}
+
+// --- VISUALIZAÇÃO ---
 
 function initOverviewSection(rawData, sectorBreakdown, defaultIndex) {
     const select = document.getElementById('overviewSectorSelect');
     select.innerHTML = ''; 
-
     sectorBreakdown.forEach((item, index) => {
         const option = document.createElement('option');
         option.value = index; 
@@ -244,227 +335,82 @@ function initOverviewSection(rawData, sectorBreakdown, defaultIndex) {
         select.appendChild(option);
     });
 
-    select.addEventListener('change', (e) => {
-        const selectedIdx = e.target.value;
-        updateOverviewData(selectedIdx, sectorBreakdown);
-    });
+    select.addEventListener('change', (e) => updateOverviewData(e.target.value, sectorBreakdown));
 
-    if (sectorBreakdown.length > defaultIndex) {
-        select.selectedIndex = defaultIndex;
-        updateOverviewData(defaultIndex, sectorBreakdown);
-    } else if (sectorBreakdown.length > 0) {
-        select.selectedIndex = 0;
-        updateOverviewData(0, sectorBreakdown);
-    }
+    const initialIdx = (sectorBreakdown.length > defaultIndex) ? defaultIndex : 0;
+    select.selectedIndex = initialIdx;
+    updateOverviewData(initialIdx, sectorBreakdown);
 }
 
 function updateOverviewData(index, sectorBreakdown) {
     const item = sectorBreakdown[index];
     if (!item) return;
 
-    // 1. Cálculos de Médias
-    const avgManha = periodDurations.manha > 0 ? item.manha / periodDurations.manha : 0;
-    const avgTarde = periodDurations.tarde > 0 ? item.tarde / periodDurations.tarde : 0;
-    const avgFora = periodDurations.foraHorario > 0 ? item.foraHorario / periodDurations.foraHorario : 0;
-    const avgNoite = periodDurations.noite > 0 ? item.noite / periodDurations.noite : 0;
+    const calcAvg = (val, dur) => dur > 0 ? val / dur : 0;
+    
+    document.getElementById('avgManhaDisplay').textContent = formatter.format(calcAvg(item.manha, periodDurations.manha));
+    document.getElementById('avgTardeDisplay').textContent = formatter.format(calcAvg(item.tarde, periodDurations.tarde));
+    document.getElementById('avgForaDisplay').textContent = formatter.format(calcAvg(item.foraHorario, periodDurations.foraHorario));
+    document.getElementById('avgNoiteDisplay').textContent = formatter.format(calcAvg(item.noite, periodDurations.noite));
 
-    // 2. Atualiza HTML dos números
-    document.getElementById('avgManhaDisplay').textContent = formatter.format(avgManha);
-    document.getElementById('avgTardeDisplay').textContent = formatter.format(avgTarde);
-    document.getElementById('avgForaDisplay').textContent = formatter.format(avgFora);
-    document.getElementById('avgNoiteDisplay').textContent = formatter.format(avgNoite);
-
-    // 3. Atualiza Gráfico de Pizza
+    // Chart Pizza
     const ctx = document.getElementById('overviewPieChart').getContext('2d');
-    
-    if (overviewPieChartInstance) {
-        overviewPieChartInstance.destroy();
-    }
-
-    const labels = [
-        `Manhã: ${formatter.format(item.manha)} m²`, 
-        `Tarde: ${formatter.format(item.tarde)} m²`, 
-        `Fora Horário: ${formatter.format(item.foraHorario)} m²`, 
-        `Noite: ${formatter.format(item.noite)} m²`
-    ];
-    
-    const dataValues = [item.manha, item.tarde, item.foraHorario, item.noite];
+    if (overviewPieChartInstance) overviewPieChartInstance.destroy();
 
     overviewPieChartInstance = new Chart(ctx, {
-        type: 'pie',
+        type: 'doughnut',
         data: {
-            labels: labels,
+            labels: ['Manhã', 'Tarde', 'Fora Horário', 'Noite'],
             datasets: [{
-                data: dataValues,
-                backgroundColor: [
-                    'rgba(54, 162, 235, 0.8)',
-                    'rgba(75, 192, 192, 0.8)',
-                    'rgba(255, 206, 86, 0.8)',
-                    'rgba(75, 0, 130, 0.8)'
-                ],
-                borderWidth: 1
+                data: [item.manha, item.tarde, item.foraHorario, item.noite],
+                backgroundColor: [brandColors.manha, brandColors.tarde, brandColors.foraHorario, brandColors.noite],
+                borderWidth: 0,
+                hoverOffset: 4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            cutout: '65%',
+            layout: { padding: { top: 0, bottom: 0, left: 20, right: 20 } },
             plugins: {
                 datalabels: { display: false },
-                legend: {
+                legend: { 
                     position: 'right',
-                    labels: { boxWidth: 20, font: { size: 14 }, padding: 20 }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let originalLabel = context.label.split(':')[0]; 
-                            let value = context.parsed;
-                            let total = context.chart._metasets[context.datasetIndex].total;
-                            let percentage = (total > 0) ? (value / total * 100).toFixed(1) + '%' : '0%';
-                            return `${originalLabel}: ${formatter.format(value)} m² (${percentage})`;
+                    align: 'center',
+                    labels: { 
+                        usePointStyle: true, 
+                        pointStyle: 'circle',
+                        font: { size: 12, family: "'Inter', sans-serif" },
+                        padding: 20,
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            if (data.labels.length && data.datasets.length) {
+                                return data.labels.map((label, i) => {
+                                    const meta = chart.getDatasetMeta(0);
+                                    const style = meta.controller.getStyle(i);
+                                    const value = data.datasets[0].data[i];
+                                    const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) + '%' : '0%';
+                                    return {
+                                        text: `${label}: ${formatter.format(value)} m² (${percentage})`,
+                                        fillStyle: style.backgroundColor,
+                                        strokeStyle: style.borderColor,
+                                        lineWidth: style.borderWidth,
+                                        hidden: isNaN(data.datasets[0].data[i]) || meta.data[i].hidden,
+                                        index: i
+                                    };
+                                });
+                            }
+                            return [];
                         }
-                    }
-                }
+                    } 
+                },
+                tooltip: { callbacks: { label: function(context) { return ` ${context.label}: ${formatter.format(context.parsed)} m²`; } } }
             }
         }
     });
 }
-
-// --- FUNÇÃO AUXILIAR INTELIGENTE PARA NÚMEROS ---
-function parseLocalizedNumber(str) {
-    if (!str) return 0;
-    let clean = str.replace(/[^\d.,-]/g, '').trim(); 
-    if (!clean) return 0;
-
-    const lastComma = clean.lastIndexOf(',');
-    const lastDot = clean.lastIndexOf('.');
-
-    if (lastComma > lastDot) {
-        clean = clean.replace(/\./g, ''); 
-        clean = clean.replace(',', '.');  
-    } else if (lastDot > lastComma) {
-        clean = clean.replace(/,/g, '');  
-    }
-    
-    return parseFloat(clean) || 0;
-}
-
-// --- FUNÇÃO DE PARSE DA TABELA ---
-function parseHtmlTable(table) {
-    const rows = Array.from(table.querySelectorAll('tr'));
-    
-    const headerRowIndex = rows.findIndex(row => {
-        const firstCell = row.querySelector('th, td');
-        if (!firstCell) return false;
-        const text = firstCell.innerText.replace(/\s+/g, ' ').trim().toLowerCase();
-        return text.startsWith('setor');
-    });
-
-    if (headerRowIndex === -1) return { headers: [], data: [] };
-
-    const headers = [];
-    const headerRow = rows[headerRowIndex];
-    headerRow.querySelectorAll('th, td').forEach(cell => {
-        headers.push(cell.innerText.replace(/\n/g, '').trim());
-    });
-
-    const data = [];
-    for (let i = headerRowIndex + 1; i < rows.length; i++) {
-        const row = rows[i];
-        const cells = row.querySelectorAll('td');
-        
-        if (cells.length < headers.length) continue;
-
-        const rowData = {};
-        let isTotalRow = false;
-
-        headers.forEach((header, index) => {
-            const cell = cells[index];
-            if (!cell) return;
-            
-            const cellText = cell.innerText.replace(/\s+/g, ' ').trim();
-
-            if (index === 0) {
-                rowData[header] = cellText;
-                if (cellText.toLowerCase() === 'total') {
-                    isTotalRow = true;
-                }
-            } else {
-                rowData[header] = parseLocalizedNumber(cellText);
-            }
-        });
-
-        if (!isTotalRow) {
-            data.push(rowData);
-        }
-    }
-    return { headers, data };
-}
-
-// --- LÓGICA DE ANÁLISE ---
-function analyzeProductionData(data) {
-    let grandTotalManha = 0;
-    let grandTotalTarde = 0;
-    let grandTotalForaHorario = 0;
-    let grandTotalNoite = 0;
-    let grandTotalProduction = 0;
-    const sectorBreakdown = [];
-
-    const nonProductionPeriodHeaders = ['setor', 'total'];
-
-    data.forEach(row => {
-        let manha = 0;
-        let tarde = 0;
-        let foraHorario = 0;
-        let noite = 0;
-        
-        const firstKey = Object.keys(row)[0];
-        const setor = row[firstKey];
-
-        Object.keys(row).forEach(header => {
-            const headerClean = header.toLowerCase();
-            if (nonProductionPeriodHeaders.some(h => headerClean.includes(h))) return; 
-            
-            const hourMatch = headerClean.match(/(\d+)/);
-            if (!hourMatch) return;
-            
-            const hour = parseInt(hourMatch[0]);
-            const value = row[header];
-
-            // --- LÓGICA DE PERÍODOS ---
-            if (hour >= 7 && hour <= 11) {
-                manha += value;
-            } else if (hour >= 13 && hour <= 16) {
-                tarde += value;
-            } else if (hour === 12 || (hour >= 17 && hour <= 21) || hour === 2) {
-                foraHorario += value;
-            } else {
-                noite += value;
-            }
-        });
-        
-        let totalSetor = 0;
-        const totalKey = Object.keys(row).find(k => k.toLowerCase() === 'total');
-        if (totalKey) {
-            totalSetor = row[totalKey];
-        } else {
-            totalSetor = manha + tarde + foraHorario + noite;
-        }
-        
-        grandTotalProduction += totalSetor;
-
-        sectorBreakdown.push({ setor, manha, tarde, foraHorario, noite, totalSetor });
-
-        grandTotalManha += manha;
-        grandTotalTarde += tarde;
-        grandTotalForaHorario += foraHorario;
-        grandTotalNoite += noite;
-    });
-
-    return { grandTotalManha, grandTotalTarde, grandTotalForaHorario, grandTotalNoite, grandTotalProduction, sectorBreakdown }; 
-}
-
-// --- FUNÇÕES DE EXIBIÇÃO ---
 
 function displaySectorTable(sectorBreakdown) {
     const tbody = document.getElementById('sectorTableBody');
@@ -472,41 +418,39 @@ function displaySectorTable(sectorBreakdown) {
 
     sectorBreakdown.forEach(item => {
         const tr = document.createElement('tr');
-        tr.className = 'hover:bg-gray-50';
+        tr.className = 'hover:bg-slate-50 transition-colors';
         
-        const totalSetor = item.totalSetor || 0;
+        const calcData = (val, duration, total) => ({
+            avg: duration > 0 ? val / duration : 0,
+            pct: total > 0 ? val / total : 0
+        });
 
-        const avgManha = (periodDurations.manha > 0) ? (item.manha / periodDurations.manha) : 0;
-        const pctManha = (totalSetor > 0) ? (item.manha / totalSetor) : 0;
-
-        const avgTarde = (periodDurations.tarde > 0) ? (item.tarde / periodDurations.tarde) : 0;
-        const pctTarde = (totalSetor > 0) ? (item.tarde / totalSetor) : 0;
-
-        const avgForaHorario = (periodDurations.foraHorario > 0) ? (item.foraHorario / periodDurations.foraHorario) : 0;
-        const pctForaHorario = (totalSetor > 0) ? (item.foraHorario / totalSetor) : 0;
-
-        const avgNoite = (periodDurations.noite > 0) ? (item.noite / periodDurations.noite) : 0;
-        const pctNoite = (totalSetor > 0) ? (item.noite / totalSetor) : 0;
+        const m = calcData(item.manha, periodDurations.manha, item.totalSetor);
+        const t = calcData(item.tarde, periodDurations.tarde, item.totalSetor);
+        const f = calcData(item.foraHorario, periodDurations.foraHorario, item.totalSetor);
+        const n = calcData(item.noite, periodDurations.noite, item.totalSetor);
+        
+        const td = (content, classes) => `<td class="${classes}">${content}</td>`;
         
         tr.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border border-gray-200">${item.setor}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 bg-gray-100 border border-gray-200">${formatter.format(totalSetor)}</td>
+            ${td(item.setor, 'px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900 border-r border-slate-200 sticky left-0 bg-white print-force-bg-gray')}
+            ${td(formatter.format(item.totalSetor), 'px-4 py-3 whitespace-nowrap text-sm font-bold text-slate-800 bg-slate-50 border-r border-slate-200 text-center print-force-bg-darker')}
 
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700 border border-gray-100">${formatter.format(item.manha)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 border border-gray-100">${formatter.format(avgManha)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-blue-700 font-medium border border-blue-50 border-r-2">${formatterPct.format(pctManha)}</td>
-            
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700 border border-gray-100">${formatter.format(item.tarde)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 border border-gray-100">${formatter.format(avgTarde)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-green-700 font-medium border border-green-50 border-r-2">${formatterPct.format(pctTarde)}</td>
-            
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700 border border-gray-100">${formatter.format(item.foraHorario)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 border border-gray-100">${formatter.format(avgForaHorario)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-yellow-700 font-medium border border-yellow-50 border-r-2">${formatterPct.format(pctForaHorario)}</td>
-            
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700 border border-gray-100">${formatter.format(item.noite)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 border border-gray-100">${formatter.format(avgNoite)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-indigo-700 font-medium border border-gray-100">${formatterPct.format(pctNoite)}</td>
+            ${td(formatter.format(item.manha), 'px-2 py-2 whitespace-nowrap text-sm text-slate-600 text-center')}
+            ${td(formatter.format(m.avg), 'px-2 py-2 whitespace-nowrap text-sm text-slate-500 text-center')}
+            ${td(formatterPct.format(m.pct), 'px-2 py-2 whitespace-nowrap text-xs font-semibold text-brand-medium bg-slate-50 border-r border-slate-200 text-center print-force-bg-gray')}
+
+            ${td(formatter.format(item.tarde), 'px-2 py-2 whitespace-nowrap text-sm text-slate-600 text-center')}
+            ${td(formatter.format(t.avg), 'px-2 py-2 whitespace-nowrap text-sm text-slate-500 text-center')}
+            ${td(formatterPct.format(t.pct), 'px-2 py-2 whitespace-nowrap text-xs font-semibold text-brand-medium bg-slate-50 border-r border-slate-200 text-center print-force-bg-gray')}
+
+            ${td(formatter.format(item.foraHorario), 'px-2 py-2 whitespace-nowrap text-sm text-slate-600 text-center')}
+            ${td(formatter.format(f.avg), 'px-2 py-2 whitespace-nowrap text-sm text-slate-500 text-center')}
+            ${td(formatterPct.format(f.pct), 'px-2 py-2 whitespace-nowrap text-xs font-semibold text-brand-red bg-slate-50 border-r border-slate-200 text-center print-force-bg-gray')}
+
+            ${td(formatter.format(item.noite), 'px-2 py-2 whitespace-nowrap text-sm text-slate-600 text-center')}
+            ${td(formatter.format(n.avg), 'px-2 py-2 whitespace-nowrap text-sm text-slate-500 text-center')}
+            ${td(formatterPct.format(n.pct), 'px-2 py-2 whitespace-nowrap text-xs font-semibold text-brand-dark bg-slate-50 text-center print-force-bg-gray')}
         `;
         tbody.appendChild(tr);
     });
@@ -514,50 +458,24 @@ function displaySectorTable(sectorBreakdown) {
 
 function displayProductionChart(sectorBreakdown) {
     const ctx = document.getElementById('productionChart').getContext('2d');
-    
-    const labels = sectorBreakdown.map(item => item.setor);
-    const manhaData = sectorBreakdown.map(item => item.manha);
-    const tardeData = sectorBreakdown.map(item => item.tarde);
-    const foraHorarioData = sectorBreakdown.map(item => item.foraHorario);
-    const noiteData = sectorBreakdown.map(item => item.noite);
-
-    if (myChart) {
-        myChart.destroy();
-    }
+    if (myChart) myChart.destroy();
 
     myChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: labels,
+            labels: sectorBreakdown.map(i => i.setor),
             datasets: [
-                { label: 'Manhã', data: manhaData, backgroundColor: 'rgba(54, 162, 235, 0.6)', borderWidth: 1 },
-                { label: 'Tarde', data: tardeData, backgroundColor: 'rgba(75, 192, 192, 0.6)', borderWidth: 1 },
-                { label: 'Fora Horário', data: foraHorarioData, backgroundColor: 'rgba(255, 206, 86, 0.6)', borderWidth: 1 },
-                { label: 'Noite', data: noiteData, backgroundColor: 'rgba(75, 0, 130, 0.6)', borderWidth: 1 }
+                { label: 'Manhã', data: sectorBreakdown.map(i => i.manha), backgroundColor: brandColors.manha },
+                { label: 'Tarde', data: sectorBreakdown.map(i => i.tarde), backgroundColor: brandColors.tarde },
+                { label: 'Fora Horário', data: sectorBreakdown.map(i => i.foraHorario), backgroundColor: brandColors.foraHorario },
+                { label: 'Noite', data: sectorBreakdown.map(i => i.noite), backgroundColor: brandColors.noite }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { 
-                y: { 
-                    beginAtZero: true,
-                    ticks: { callback: function(value) { return formatter.format(value); } } 
-                } 
-            },
-            plugins: {
-                datalabels: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) label += ': ';
-                            if (context.parsed.y !== null) label += formatter.format(context.parsed.y) + ' m²';
-                            return label;
-                        }
-                    }
-                }
-            }
+            scales: { y: { beginAtZero: true, grid: { borderDash: [2, 4] } }, x: { grid: { display: false } } },
+            plugins: { datalabels: { display: false } }
         }
     });
 }
@@ -565,176 +483,103 @@ function displayProductionChart(sectorBreakdown) {
 function populateSectorCheckboxes(data, defaultIndex) {
     const container = document.getElementById('sectorCheckboxContainer');
     container.innerHTML = ''; 
-
     data.forEach((row, index) => {
         const sectorName = row[Object.keys(row)[0]];
-        const isChecked = (index === defaultIndex) ? 'checked' : '';
-
-        const checkboxHTML = `
-            <div class="flex items-center p-2 hover:bg-white rounded transition-colors cursor-pointer">
-                <input type="checkbox" 
-                       id="sector-cb-${index}" 
-                       value="${sectorName}" 
-                       class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                       ${isChecked}> 
-                <label for="sector-cb-${index}" class="ml-2 block text-sm text-gray-700 cursor-pointer select-none">${sectorName}</label>
-            </div>
-        `;
-        container.insertAdjacentHTML('beforeend', checkboxHTML);
+        const isChecked = index === defaultIndex ? 'checked' : '';
+        const id = `cb-${index}`;
+        
+        const html = `
+            <div class="flex items-center p-2 rounded hover:bg-slate-100 transition-colors">
+                <input type="checkbox" id="${id}" value="${sectorName}" ${isChecked} 
+                       class="h-4 w-4 text-brand-medium border-slate-300 rounded focus:ring-brand-medium cursor-pointer">
+                <label for="${id}" class="ml-2 text-sm text-slate-700 cursor-pointer w-full select-none truncate" title="${sectorName}">${sectorName}</label>
+            </div>`;
+        container.insertAdjacentHTML('beforeend', html);
     });
 
     container.addEventListener('change', () => {
-        const selectedSectors = [];
-        container.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
-            selectedSectors.push(checkbox.value);
-        });
-        displayHourlyChart(selectedSectors);
+        const selected = Array.from(container.querySelectorAll('input:checked')).map(cb => cb.value);
+        displayHourlyChart(selected);
     });
 }
 
-// --- PLUGIN CUSTOMIZADO (AJUSTADO: POSIÇÃO INFERIOR) ---
 const periodBackgroundPlugin = {
     id: 'periodBackgroundPlugin',
     beforeDraw: (chart) => {
-        const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
-        
+        const { ctx, chartArea: { bottom }, scales: { x } } = chart;
         ctx.save();
+        const ticks = x.getTicks();
+        if (ticks.length < 1) { ctx.restore(); return; }
         
-        const xTicks = x.getTicks(); 
-        if (xTicks.length < 1) {
-            ctx.restore();
-            return;
-        }
+        const yPos = bottom;
+        const height = 6;
 
-        const barHeight = 8; // Altura da barra
-        const yPos = bottom; // Posiciona exatamente ABAIXO da linha do eixo X
-
-        xTicks.forEach((tick, index) => {
+        ticks.forEach((tick, index) => {
             const label = chart.data.labels[index];
-            const hourMatch = label ? label.match(/(\d+)h/i) : null;
-            if (!hourMatch) return;
-            const hour = parseInt(hourMatch[1]);
-            
-            let color = null;
-            
-            // Cores
-            if (hour >= 7 && hour <= 11) {
-                color = 'rgba(54, 162, 235, 0.4)'; // Manhã
-            } else if (hour >= 13 && hour <= 16) {
-                color = 'rgba(75, 192, 192, 0.4)'; // Tarde
-            } else if (hour === 12 || (hour >= 17 && hour <= 21) || hour === 2) {
-                color = 'rgba(255, 206, 86, 0.4)'; // Fora
-            } else {
-                color = 'rgba(75, 0, 130, 0.4)';   // Noite
-            }
-            
-            if (color) {
-                const currentX = x.getPixelForValue(index);
-                let nextX;
+            const hour = parseInt((label.match(/(\d+)h/i) || [])[1]);
+            if (isNaN(hour)) return;
 
-                if (index < xTicks.length - 1) {
-                    nextX = x.getPixelForValue(index + 1);
-                } else {
-                    const prevX = x.getPixelForValue(index - 1);
-                    const stepWidth = currentX - prevX;
-                    nextX = currentX + stepWidth;
-                }
+            let color;
+            if (hour >= 7 && hour <= 11) color = brandColors.manha;
+            else if (hour >= 13 && hour <= 16) color = brandColors.tarde;
+            else if (hour === 12 || (hour >= 17 && hour <= 21) || hour === 2) color = brandColors.foraHorario;
+            else color = brandColors.noite;
 
-                const width = nextX - currentX;
-
-                ctx.fillStyle = color;
-                ctx.fillRect(currentX, yPos, width, barHeight);
-            }
+            const xPos = x.getPixelForValue(index);
+            let width = 0;
+            if (index < ticks.length - 1) width = x.getPixelForValue(index + 1) - xPos;
+            else if (index > 0) width = xPos - x.getPixelForValue(index - 1);
+            
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(xPos - width/2, yPos, width, height);
         });
-        
         ctx.restore();
     }
 };
 
-function displayHourlyChart(selectedSectorNamesArray) {
+function displayHourlyChart(selectedSectors) {
     const ctx = document.getElementById('hourlyChart').getContext('2d');
     const { headers, data } = parsedDataCache;
+    
+    const colors = [brandColors.tarde, brandColors.foraHorario, '#EAB308', brandColors.noite, '#8b5cf6', '#0ea5e9'];
 
-    const chartColors = ['rgba(239, 68, 68, 1)', 'rgba(54, 162, 235, 1)', 'rgba(75, 192, 192, 1)', 'rgba(255, 206, 86, 1)', 'rgba(139, 92, 246, 1)'];
-    // Opacidade reduzida para não brigar com a barra
-    const chartBgColors = ['rgba(239, 68, 68, 0.05)', 'rgba(54, 162, 235, 0.05)', 'rgba(75, 192, 192, 0.05)', 'rgba(255, 206, 86, 0.05)', 'rgba(139, 92, 246, 0.05)'];
-
-    const chartLabels = [];
-    const datasets = [];
-
-    headers.forEach(header => {
-        const match = header.match(/(\d+)h/i);
-        if (match) {
-             const hour = parseInt(match[1]);
-             if (!isNaN(hour)) {
-                 chartLabels.push(header);
-             }
-        }
-    });
-
-    selectedSectorNamesArray.forEach((sectorName, index) => {
-        const sectorData = data.find(row => row[Object.keys(row)[0]] === sectorName);
-        if (!sectorData) return; 
-
-        const chartDataPoints = [];
-        chartLabels.forEach(label => {
-            chartDataPoints.push(sectorData[label] || 0);
-        });
-
-        const colorIndex = index % chartColors.length;
-
-        datasets.push({
-            label: `${sectorName}`,
-            data: chartDataPoints,
-            borderColor: chartColors[colorIndex],
-            backgroundColor: chartBgColors[colorIndex],
+    const labels = headers.filter(h => h.match(/(\d+)h/i));
+    const datasets = selectedSectors.map((sec, idx) => {
+        const row = data.find(r => r[Object.keys(r)[0]] === sec);
+        const values = labels.map(l => row ? (row[l] || 0) : 0);
+        const color = colors[idx % colors.length];
+        
+        return {
+            label: sec,
+            data: values,
+            borderColor: color,
+            backgroundColor: color + '10', 
+            borderWidth: 2,
+            pointRadius: 3,
             fill: true,
-            tension: 0.1
-        });
+            tension: 0.3
+        };
     });
 
-    if (hourlyChartInstance) {
-        hourlyChartInstance.destroy();
-    }
+    if (hourlyChartInstance) hourlyChartInstance.destroy();
 
     hourlyChartInstance = new Chart(ctx, {
         type: 'line',
-        data: { labels: chartLabels, datasets: datasets },
-        plugins: [periodBackgroundPlugin], // Registra o plugin aqui
+        data: { labels, datasets },
+        plugins: [periodBackgroundPlugin],
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            scales: { 
-                y: { 
-                    beginAtZero: true,
-                    ticks: { callback: function(value) { return formatter.format(value); } }
-                } 
-            },
-            plugins: {
-                datalabels: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) label += ': ';
-                            if (context.parsed.y !== null) label += formatter.format(context.parsed.y) + ' m²';
-                            return label;
-                        }
-                    }
-                }
-            }
+            interaction: { mode: 'index', intersect: false },
+            scales: { y: { beginAtZero: true, grid: { borderDash: [4, 4] } }, x: { grid: { display: false } } },
+            plugins: { datalabels: { display: false } }
         }
     });
 }
 
-function showMessage(message, type = "info") {
-    const statusMessage = document.getElementById('statusMessage');
-    statusMessage.textContent = message;
-    if (type === "error") {
-        statusMessage.className = "mt-4 text-center text-sm font-medium text-red-600";
-    } else if (type === "success") {
-        statusMessage.className = "mt-4 text-center text-sm font-medium text-green-600";
-    } else {
-        statusMessage.className = "mt-4 text-center text-sm font-medium text-gray-700";
-    }
+function showMessage(msg, type = "info") {
+    const el = document.getElementById('statusMessage');
+    el.textContent = msg;
+    el.className = `mt-4 text-center text-sm font-medium ${type === 'error' ? 'text-red-500' : 'text-slate-500'}`;
 }

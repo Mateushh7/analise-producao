@@ -1,78 +1,87 @@
-/* Estilos personalizados para o editor de colagem */
+/* Estilo Placeholder */
 #pasteBox:empty::before {
-    content: "Clique aqui e cole a tabela (Ctrl+V)...";
-    color: #9ca3af; /* text-gray-400 */
+    content: "Clique aqui e pressione Ctrl+V para colar a tabela...";
+    color: #94a3b8;
     font-style: italic;
+    font-weight: 400;
 }
 
-/* Configurações de Impressão (Ctrl + P) */
+/* Container de Colagem */
+#pasteBox {
+    height: 100%; /* Ocupa altura do pai definido no HTML */
+    max-height: 100%;
+    overflow: hidden; /* Não deve rolar */
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Centraliza Placeholder ou Card de Sucesso */
+    align-items: center;     /* CORRIGIDO: Centraliza horizontalmente */
+    outline: none;
+    cursor: text;
+    text-align: center;      /* Garante que o texto de placeholder também centralize */
+}
+
+/* Animação suave para o card de sucesso */
+@keyframes pulseOnce {
+    0% { transform: scale(0.95); opacity: 0.7; }
+    50% { transform: scale(1.02); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-pulse-once {
+    animation: pulseOnce 0.4s ease-out forwards;
+}
+
+/* Utilitários e Animações */
+@layer utilities {
+    .fade-in { animation: fadeIn 0.5s ease-in-out; }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Scrollbar Personalizada */
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+
+#detailsTable thead th { box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+
+/* --- CONFIGURAÇÕES DE IMPRESSÃO --- */
 @media print {
-    /* Esconde elementos de navegação e input */
-    .no-print, 
-    #headerControls, 
-    #inputSection, 
-    #downloadExcelBtn {
-        display: none !important;
-    }
+    .no-print, nav, #inputSection, footer, #headerControls { display: none !important; }
+    
+    @page { margin: 0.5cm; size: landscape; }
 
-    /* Ajustes gerais de layout */
-    body {
-        background-color: white;
+    body { 
+        background-color: white !important; 
+        color: black !important; 
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
     
-    .container {
-        max-width: 100% !important;
-        padding: 0 !important;
-        margin: 0 !important;
-    }
+    .container { max-width: 100% !important; width: 100% !important; padding: 0 !important; margin: 0 !important; }
+    #resultsArea { display: block !important; margin-top: 0 !important; }
 
-    #resultsArea {
-        display: block !important;
-        margin-top: 0 !important;
-    }
+    .print-no-shadow { box-shadow: none !important; }
+    .print-no-border { border: none !important; }
+    .print-no-bg { background-color: transparent !important; }
 
-    /* Remove sombras e bordas desnecessárias */
-    .print-no-shadow {
-        box-shadow: none !important;
-    }
-    
-    .print-no-border {
-        border: none !important;
-    }
+    /* Cores Forçadas */
+    .print-force-bg-manha { background-color: #6DAFB8 !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .print-force-bg-tarde { background-color: #2C6E7A !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .print-force-bg-fora  { background-color: #C63832 !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .print-force-bg-noite { background-color: #163A4A !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .print-force-bg-gray  { background-color: #f1f5f9 !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .print-force-bg-darker { background-color: #e2e8f0 !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-    .print-no-bg {
-        background-color: transparent !important;
-    }
+    #detailsTable { width: 100% !important; border-collapse: collapse !important; font-size: 9pt !important; }
+    #detailsTable th, #detailsTable td { border: 1px solid #cbd5e1 !important; padding: 4px !important; white-space: nowrap !important; }
+    .overflow-x-auto { overflow: visible !important; display: block !important; }
 
-    /* Força cores de fundo para impressão (navegadores podem bloquear isso por padrão, mas ajuda) */
-    .print-bg-gray { background-color: #f3f4f6 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .print-bg-blue { background-color: #eff6ff !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .print-bg-green { background-color: #f0fdf4 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .print-bg-yellow { background-color: #fefce8 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .print-bg-indigo { background-color: #eef2ff !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .print-bg-darker { background-color: #e5e7eb !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-
-    /* Quebras de página */
-    .print-break-before {
-        page-break-before: always;
-        break-before: page;
-        height: 1px;
-        display: block;
-    }
-
-    /* Ajuste de gráficos para caber na folha */
-    canvas {
-        max-width: 100% !important;
-        max-height: 100% !important;
-    }
-    
-    /* Garante que bordas de tabelas apareçam */
-    table, th, td {
-        border: 1px solid #d1d5db !important;
-    }
-    
-    /* Ajuste para cartões de média */
-    .print-border {
-        border: 1px solid #e5e7eb !important;
-    }
+    .print-break-before { page-break-before: always; break-before: page; display: block; height: 1px; }
+    .bg-white { page-break-inside: avoid; }
+    canvas { max-width: 100% !important; max-height: 100% !important; }
 }
