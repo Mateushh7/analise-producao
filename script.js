@@ -7,6 +7,7 @@ if (typeof ChartDataLabels !== 'undefined') {
 let myChart;
 let hourlyChartInstance;
 let overviewPieChartInstance; 
+let currentSelectedDate = '';
 
 // Formatador de números global para 'pt-BR' (usa , como decimal e . como milhar)
 const formatter = new Intl.NumberFormat('pt-BR', {
@@ -23,10 +24,10 @@ const formatterPct = new Intl.NumberFormat('pt-BR', {
 
 // Define a duração (em horas) de cada período (Divisores para média)
 const periodDurations = {
-    manha: 4.75,       // Definido pelo usuário
-    tarde: 4,          // Definido pelo usuário
-    foraHorario: 7,    // 12h + 17h-21h (5h) + 02h = 7 horas totais
-    noite: 7.61        // Definido pelo usuário
+    manha: 4.75,       
+    tarde: 4,          
+    foraHorario: 7,    
+    noite: 7.61        
 };
 
 let parsedDataCache = {};
@@ -48,13 +49,30 @@ document.getElementById('clearButton').addEventListener('click', () => {
 // BOTÃO "PROCESSAR DADOS"
 document.getElementById('extractButton').addEventListener('click', () => {
     const pasteBox = document.getElementById('pasteBox');
+    const dateInput = document.getElementById('reportDate');
     const statusMessage = document.getElementById('statusMessage');
     const resultsArea = document.getElementById('resultsArea');
     const inputSection = document.getElementById('inputSection');
     const headerControls = document.getElementById('headerControls');
+    const displayDateSpan = document.getElementById('displayDate');
 
     resultsArea.classList.add('hidden');
     statusMessage.textContent = ''; 
+
+    // Validação da Data
+    if (!dateInput.value) {
+        showMessage("Por favor, selecione uma data antes de processar.", "error");
+        dateInput.focus();
+        return;
+    }
+    
+    // Formata data para exibir (pt-BR)
+    const dateObj = new Date(dateInput.value);
+    // Ajuste de fuso horário simples para exibir a data correta
+    const userTimezoneOffset = dateObj.getTimezoneOffset() * 60000;
+    const dateAdjusted = new Date(dateObj.getTime() + userTimezoneOffset);
+    currentSelectedDate = dateAdjusted.toLocaleDateString('pt-BR');
+    displayDateSpan.textContent = currentSelectedDate;
     
     const pastedHtml = pasteBox.innerHTML;
     if (!pastedHtml.trim()) {
@@ -117,6 +135,68 @@ document.getElementById('extractButton').addEventListener('click', () => {
     }
 });
 
+// BOTÃO EXPORTAR EXCEL
+document.getElementById('downloadExcelBtn').addEventListener('click', () => {
+    if (!analysisResultsCache.sectorBreakdown) return;
+
+    // Criação dos dados para o Excel
+    const wb = XLSX.utils.book_new();
+    
+    // Cabeçalho do Relatório
+    const ws_data = [
+        ["Relatório Detalhado por Setor"],
+        ["Data de Referência:", currentSelectedDate],
+        [], // Linha em branco
+        // Cabeçalhos da Tabela
+        [
+            "Setor", 
+            "Total Dia (m²)", 
+            "Manhã Total", "Manhã Média/h", "Manhã %",
+            "Tarde Total", "Tarde Média/h", "Tarde %",
+            "Fora Total", "Fora Média/h", "Fora %",
+            "Noite Total", "Noite Média/h", "Noite %"
+        ]
+    ];
+
+    // Adiciona linhas de dados
+    analysisResultsCache.sectorBreakdown.forEach(item => {
+        const totalSetor = item.totalSetor || 0;
+        
+        // Cálculos
+        const avgManha = periodDurations.manha > 0 ? item.manha / periodDurations.manha : 0;
+        const pctManha = totalSetor > 0 ? item.manha / totalSetor : 0;
+
+        const avgTarde = periodDurations.tarde > 0 ? item.tarde / periodDurations.tarde : 0;
+        const pctTarde = totalSetor > 0 ? item.tarde / totalSetor : 0;
+
+        const avgFora = periodDurations.foraHorario > 0 ? item.foraHorario / periodDurations.foraHorario : 0;
+        const pctFora = totalSetor > 0 ? item.foraHorario / totalSetor : 0;
+
+        const avgNoite = periodDurations.noite > 0 ? item.noite / periodDurations.noite : 0;
+        const pctNoite = totalSetor > 0 ? item.noite / totalSetor : 0;
+
+        ws_data.push([
+            item.setor,
+            totalSetor,
+            item.manha, avgManha, pctManha,
+            item.tarde, avgTarde, pctTarde,
+            item.foraHorario, avgFora, pctFora,
+            item.noite, avgNoite, pctNoite
+        ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+    // Formatação básica (apenas definindo colunas com porcentagem se possível, 
+    // mas SheetJS community version tem limitações de estilo visual)
+    
+    XLSX.utils.book_append_sheet(wb, ws, "Produção");
+    
+    // Nome do arquivo seguro
+    const fileNameDate = currentSelectedDate.replace(/\//g, '-');
+    XLSX.writeFile(wb, `Relatorio_Producao_${fileNameDate}.xlsx`);
+});
+
 // --- FUNÇÃO PARA ENCONTRAR TABELA ---
 function findTargetTable(container) {
     const tables = container.querySelectorAll('table');
@@ -145,6 +225,9 @@ document.getElementById('showInputBtn').addEventListener('click', () => {
     inputSection.classList.remove('hidden');
     headerControls.classList.add('hidden');
     resultsArea.classList.add('hidden'); 
+    
+    // Limpa a data selecionada visualmente
+    document.getElementById('reportDate').value = '';
 });
 
 
@@ -406,24 +489,24 @@ function displaySectorTable(sectorBreakdown) {
         const pctNoite = (totalSetor > 0) ? (item.noite / totalSetor) : 0;
         
         tr.innerHTML = `
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.setor}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 bg-gray-100 border-r border-gray-200">${formatter.format(totalSetor)}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border border-gray-200">${item.setor}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800 bg-gray-100 border border-gray-200">${formatter.format(totalSetor)}</td>
 
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700">${formatter.format(item.manha)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${formatter.format(avgManha)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-blue-700 font-medium border-r border-blue-50">${formatterPct.format(pctManha)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700 border border-gray-100">${formatter.format(item.manha)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 border border-gray-100">${formatter.format(avgManha)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-blue-700 font-medium border border-blue-50 border-r-2">${formatterPct.format(pctManha)}</td>
             
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700">${formatter.format(item.tarde)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${formatter.format(avgTarde)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-green-700 font-medium border-r border-green-50">${formatterPct.format(pctTarde)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700 border border-gray-100">${formatter.format(item.tarde)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 border border-gray-100">${formatter.format(avgTarde)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-green-700 font-medium border border-green-50 border-r-2">${formatterPct.format(pctTarde)}</td>
             
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700">${formatter.format(item.foraHorario)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${formatter.format(avgForaHorario)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-yellow-700 font-medium border-r border-yellow-50">${formatterPct.format(pctForaHorario)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700 border border-gray-100">${formatter.format(item.foraHorario)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 border border-gray-100">${formatter.format(avgForaHorario)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-yellow-700 font-medium border border-yellow-50 border-r-2">${formatterPct.format(pctForaHorario)}</td>
             
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700">${formatter.format(item.noite)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">${formatter.format(avgNoite)}</td>
-            <td class="px-4 py-4 whitespace-nowrap text-sm text-indigo-700 font-medium">${formatterPct.format(pctNoite)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-700 border border-gray-100">${formatter.format(item.noite)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 border border-gray-100">${formatter.format(avgNoite)}</td>
+            <td class="px-4 py-4 whitespace-nowrap text-sm text-indigo-700 font-medium border border-gray-100">${formatterPct.format(pctNoite)}</td>
         `;
         tbody.appendChild(tr);
     });

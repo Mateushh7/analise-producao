@@ -4,3 +4,75 @@
     color: #9ca3af; /* text-gray-400 */
     font-style: italic;
 }
+
+/* Configurações de Impressão (Ctrl + P) */
+@media print {
+    /* Esconde elementos de navegação e input */
+    .no-print, 
+    #headerControls, 
+    #inputSection, 
+    #downloadExcelBtn {
+        display: none !important;
+    }
+
+    /* Ajustes gerais de layout */
+    body {
+        background-color: white;
+    }
+    
+    .container {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    #resultsArea {
+        display: block !important;
+        margin-top: 0 !important;
+    }
+
+    /* Remove sombras e bordas desnecessárias */
+    .print-no-shadow {
+        box-shadow: none !important;
+    }
+    
+    .print-no-border {
+        border: none !important;
+    }
+
+    .print-no-bg {
+        background-color: transparent !important;
+    }
+
+    /* Força cores de fundo para impressão (navegadores podem bloquear isso por padrão, mas ajuda) */
+    .print-bg-gray { background-color: #f3f4f6 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .print-bg-blue { background-color: #eff6ff !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .print-bg-green { background-color: #f0fdf4 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .print-bg-yellow { background-color: #fefce8 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .print-bg-indigo { background-color: #eef2ff !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .print-bg-darker { background-color: #e5e7eb !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+
+    /* Quebras de página */
+    .print-break-before {
+        page-break-before: always;
+        break-before: page;
+        height: 1px;
+        display: block;
+    }
+
+    /* Ajuste de gráficos para caber na folha */
+    canvas {
+        max-width: 100% !important;
+        max-height: 100% !important;
+    }
+    
+    /* Garante que bordas de tabelas apareçam */
+    table, th, td {
+        border: 1px solid #d1d5db !important;
+    }
+    
+    /* Ajuste para cartões de média */
+    .print-border {
+        border: 1px solid #e5e7eb !important;
+    }
+}
