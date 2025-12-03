@@ -21,12 +21,12 @@ const formatterPct = new Intl.NumberFormat('pt-BR', {
     maximumFractionDigits: 1
 });
 
-// Define a duração (em horas) de cada período
+// Define a duração (em horas) de cada período (Divisores para média)
 const periodDurations = {
-    manha: 4.75,
-    tarde: 4,
-    foraHorario: 5,
-    noite: 9
+    manha: 4.75,       // Definido pelo usuário
+    tarde: 4,          // Definido pelo usuário
+    foraHorario: 7,    // 12h + 17h-21h (5h) + 02h = 7 horas totais
+    noite: 7.61        // Definido pelo usuário
 };
 
 let parsedDataCache = {};
@@ -58,21 +58,30 @@ document.getElementById('extractButton').addEventListener('click', () => {
     
     const pastedHtml = pasteBox.innerHTML;
     if (!pastedHtml.trim()) {
-        showMessage("A caixa de colagem está vazia. Cole a tabela primeiro.", "error");
+        showMessage("A caixa de colagem está vazia. Cole o conteúdo da página primeiro.", "error");
         return;
     }
 
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = pastedHtml;
-    const table = tempDiv.querySelector('table');
+
+    // 1. Tenta encontrar a tabela correta
+    const table = findTargetTable(tempDiv);
 
     if (!table) {
-        showMessage("Nenhuma tabela foi encontrada no conteúdo colado.", "error");
+        showMessage("Não foi possível encontrar a tabela começando com 'Setor'. Verifique se copiou a página correta.", "error");
         return;
     }
 
     try {
+        // 2. Processa a tabela encontrada
         const parsedData = parseHtmlTable(table);
+        
+        if (parsedData.data.length === 0) {
+            showMessage("A tabela foi encontrada, mas não contém dados legíveis.", "error");
+            return;
+        }
+
         parsedDataCache = parsedData;
 
         const analysisResults = analyzeProductionData(parsedData.data);
@@ -82,6 +91,7 @@ document.getElementById('extractButton').addEventListener('click', () => {
         displayProductionChart(analysisResults.sectorBreakdown);
 
         let defaultIndex = 0;
+        // Tenta pegar o segundo item (índice 1) como padrão se houver dados suficientes
         if (parsedData.data.length >= 2) {
             defaultIndex = 1; 
         }
@@ -89,8 +99,10 @@ document.getElementById('extractButton').addEventListener('click', () => {
         initOverviewSection(parsedData.data, analysisResults.sectorBreakdown, defaultIndex);
         populateSectorCheckboxes(parsedData.data, defaultIndex);
         
-        const defaultSectorName = parsedData.data[defaultIndex][Object.keys(parsedData.data[defaultIndex])[0]];
-        displayHourlyChart([defaultSectorName]); 
+        if (parsedData.data[defaultIndex]) {
+            const defaultSectorName = parsedData.data[defaultIndex][Object.keys(parsedData.data[defaultIndex])[0]];
+            displayHourlyChart([defaultSectorName]); 
+        }
 
         // SUCESSO: Mostrar resultados e esconder inputs
         resultsArea.classList.remove('hidden');
@@ -101,9 +113,28 @@ document.getElementById('extractButton').addEventListener('click', () => {
 
     } catch (error) {
         console.error("Erro ao analisar dados:", error);
-        showMessage("Erro ao analisar dados para gráfico/cálculos.", "error");
+        showMessage("Erro ao processar os dados. O formato numérico pode estar inconsistente.", "error");
     }
 });
+
+// --- FUNÇÃO PARA ENCONTRAR TABELA ---
+function findTargetTable(container) {
+    const tables = container.querySelectorAll('table');
+    
+    for (const table of tables) {
+        const rows = table.querySelectorAll('tr');
+        for (let i = 0; i < rows.length; i++) {
+            const firstCell = rows[i].querySelector('th, td');
+            if (firstCell) {
+                const text = firstCell.innerText.replace(/\s+/g, ' ').trim().toLowerCase();
+                if (text.startsWith('setor')) {
+                    return table; 
+                }
+            }
+        }
+    }
+    return null;
+}
 
 // BOTÃO "NOVA CONSULTA"
 document.getElementById('showInputBtn').addEventListener('click', () => {
@@ -130,27 +161,31 @@ function initOverviewSection(rawData, sectorBreakdown, defaultIndex) {
         select.appendChild(option);
     });
 
-    select.selectedIndex = defaultIndex;
-
     select.addEventListener('change', (e) => {
         const selectedIdx = e.target.value;
         updateOverviewData(selectedIdx, sectorBreakdown);
     });
 
-    updateOverviewData(defaultIndex, sectorBreakdown);
+    if (sectorBreakdown.length > defaultIndex) {
+        select.selectedIndex = defaultIndex;
+        updateOverviewData(defaultIndex, sectorBreakdown);
+    } else if (sectorBreakdown.length > 0) {
+        select.selectedIndex = 0;
+        updateOverviewData(0, sectorBreakdown);
+    }
 }
 
 function updateOverviewData(index, sectorBreakdown) {
     const item = sectorBreakdown[index];
     if (!item) return;
 
-    // 1. Cálculos de Médias (REMOVIDO Média Geral)
+    // 1. Cálculos de Médias
     const avgManha = periodDurations.manha > 0 ? item.manha / periodDurations.manha : 0;
     const avgTarde = periodDurations.tarde > 0 ? item.tarde / periodDurations.tarde : 0;
     const avgFora = periodDurations.foraHorario > 0 ? item.foraHorario / periodDurations.foraHorario : 0;
     const avgNoite = periodDurations.noite > 0 ? item.noite / periodDurations.noite : 0;
 
-    // 2. Atualiza HTML dos números (APENAS POR PERÍODO)
+    // 2. Atualiza HTML dos números
     document.getElementById('avgManhaDisplay').textContent = formatter.format(avgManha);
     document.getElementById('avgTardeDisplay').textContent = formatter.format(avgTarde);
     document.getElementById('avgForaDisplay').textContent = formatter.format(avgFora);
@@ -163,7 +198,6 @@ function updateOverviewData(index, sectorBreakdown) {
         overviewPieChartInstance.destroy();
     }
 
-    // Prepara labels para a legenda (Inclui unidade m²)
     const labels = [
         `Manhã: ${formatter.format(item.manha)} m²`, 
         `Tarde: ${formatter.format(item.tarde)} m²`, 
@@ -180,10 +214,10 @@ function updateOverviewData(index, sectorBreakdown) {
             datasets: [{
                 data: dataValues,
                 backgroundColor: [
-                    'rgba(54, 162, 235, 0.8)', // Azul
-                    'rgba(75, 192, 192, 0.8)', // Verde
-                    'rgba(255, 206, 86, 0.8)', // Amarelo
-                    'rgba(75, 0, 130, 0.8)'    // Roxo
+                    'rgba(54, 162, 235, 0.8)',
+                    'rgba(75, 192, 192, 0.8)',
+                    'rgba(255, 206, 86, 0.8)',
+                    'rgba(75, 0, 130, 0.8)'
                 ],
                 borderWidth: 1
             }]
@@ -192,18 +226,10 @@ function updateOverviewData(index, sectorBreakdown) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                datalabels: {
-                    display: false
-                },
+                datalabels: { display: false },
                 legend: {
                     position: 'right',
-                    labels: {
-                        boxWidth: 20, 
-                        font: {
-                            size: 14 
-                        },
-                        padding: 20
-                    }
+                    labels: { boxWidth: 20, font: { size: 14 }, padding: 20 }
                 },
                 tooltip: {
                     callbacks: {
@@ -211,8 +237,7 @@ function updateOverviewData(index, sectorBreakdown) {
                             let originalLabel = context.label.split(':')[0]; 
                             let value = context.parsed;
                             let total = context.chart._metasets[context.datasetIndex].total;
-                            let percentage = (value / total * 100).toFixed(1) + '%';
-                            // Exibe unidade m² no tooltip
+                            let percentage = (total > 0) ? (value / total * 100).toFixed(1) + '%' : '0%';
                             return `${originalLabel}: ${formatter.format(value)} m² (${percentage})`;
                         }
                     }
@@ -222,21 +247,50 @@ function updateOverviewData(index, sectorBreakdown) {
     });
 }
 
-// --- FUNÇÕES DE PARSE E CÁLCULO ---
+// --- FUNÇÃO AUXILIAR INTELIGENTE PARA NÚMEROS ---
+function parseLocalizedNumber(str) {
+    if (!str) return 0;
+    let clean = str.replace(/[^\d.,-]/g, '').trim(); 
+    if (!clean) return 0;
 
+    const lastComma = clean.lastIndexOf(',');
+    const lastDot = clean.lastIndexOf('.');
+
+    if (lastComma > lastDot) {
+        clean = clean.replace(/\./g, ''); 
+        clean = clean.replace(',', '.');  
+    } else if (lastDot > lastComma) {
+        clean = clean.replace(/,/g, '');  
+    }
+    
+    return parseFloat(clean) || 0;
+}
+
+// --- FUNÇÃO DE PARSE DA TABELA ---
 function parseHtmlTable(table) {
+    const rows = Array.from(table.querySelectorAll('tr'));
+    
+    const headerRowIndex = rows.findIndex(row => {
+        const firstCell = row.querySelector('th, td');
+        if (!firstCell) return false;
+        const text = firstCell.innerText.replace(/\s+/g, ' ').trim().toLowerCase();
+        return text.startsWith('setor');
+    });
+
+    if (headerRowIndex === -1) return { headers: [], data: [] };
+
     const headers = [];
-    table.querySelectorAll('tr')[0].querySelectorAll('th, td').forEach(cell => {
-        headers.push(cell.innerText.trim());
+    const headerRow = rows[headerRowIndex];
+    headerRow.querySelectorAll('th, td').forEach(cell => {
+        headers.push(cell.innerText.replace(/\n/g, '').trim());
     });
 
     const data = [];
-    const rows = table.querySelectorAll('tr');
-
-    for (let i = 1; i < rows.length; i++) {
+    for (let i = headerRowIndex + 1; i < rows.length; i++) {
         const row = rows[i];
         const cells = row.querySelectorAll('td');
-        if (cells.length === 0) continue;
+        
+        if (cells.length < headers.length) continue;
 
         const rowData = {};
         let isTotalRow = false;
@@ -245,7 +299,7 @@ function parseHtmlTable(table) {
             const cell = cells[index];
             if (!cell) return;
             
-            const cellText = cell.innerText.trim();
+            const cellText = cell.innerText.replace(/\s+/g, ' ').trim();
 
             if (index === 0) {
                 rowData[header] = cellText;
@@ -253,9 +307,7 @@ function parseHtmlTable(table) {
                     isTotalRow = true;
                 }
             } else {
-                // Remove vírgula para processamento interno (assumindo input US ou 'clean')
-                const numericValue = cellText.replace(/,/g, ''); 
-                rowData[header] = parseFloat(numericValue) || 0;
+                rowData[header] = parseLocalizedNumber(cellText);
             }
         });
 
@@ -266,6 +318,7 @@ function parseHtmlTable(table) {
     return { headers, data };
 }
 
+// --- LÓGICA DE ANÁLISE ---
 function analyzeProductionData(data) {
     let grandTotalManha = 0;
     let grandTotalTarde = 0;
@@ -281,29 +334,40 @@ function analyzeProductionData(data) {
         let tarde = 0;
         let foraHorario = 0;
         let noite = 0;
-        const setor = row[Object.keys(row)[0]];
+        
+        const firstKey = Object.keys(row)[0];
+        const setor = row[firstKey];
 
         Object.keys(row).forEach(header => {
             const headerClean = header.toLowerCase();
-            if (nonProductionPeriodHeaders.includes(headerClean)) return; 
+            if (nonProductionPeriodHeaders.some(h => headerClean.includes(h))) return; 
             
-            const hour = parseInt(header.replace('h', ''));
-            if (isNaN(hour)) return;
-
+            const hourMatch = headerClean.match(/(\d+)/);
+            if (!hourMatch) return;
+            
+            const hour = parseInt(hourMatch[0]);
             const value = row[header];
 
-            if (hour >= 7 && hour <= 12) {
+            // --- LÓGICA DE PERÍODOS ---
+            if (hour >= 7 && hour <= 11) {
                 manha += value;
             } else if (hour >= 13 && hour <= 16) {
                 tarde += value;
-            } else if (hour >= 17 && hour <= 21) {
+            } else if (hour === 12 || (hour >= 17 && hour <= 21) || hour === 2) {
                 foraHorario += value;
-            } else if (hour >= 22 || (hour >= 0 && hour <= 6)) {
+            } else {
                 noite += value;
             }
         });
         
-        const totalSetor = row['Total'] || 0;
+        let totalSetor = 0;
+        const totalKey = Object.keys(row).find(k => k.toLowerCase() === 'total');
+        if (totalKey) {
+            totalSetor = row[totalKey];
+        } else {
+            totalSetor = manha + tarde + foraHorario + noite;
+        }
+        
         grandTotalProduction += totalSetor;
 
         sectorBreakdown.push({ setor, manha, tarde, foraHorario, noite, totalSetor });
@@ -391,31 +455,21 @@ function displayProductionChart(sectorBreakdown) {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false, // Permite altura customizada
+            maintainAspectRatio: false,
             scales: { 
                 y: { 
                     beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return formatter.format(value); // Usa formato BR no eixo
-                        }
-                    } 
+                    ticks: { callback: function(value) { return formatter.format(value); } } 
                 } 
             },
             plugins: {
-                datalabels: {
-                    display: false
-                },
+                datalabels: { display: false },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
                             let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== null) {
-                                label += formatter.format(context.parsed.y) + ' m²';
-                            }
+                            if (label) label += ': ';
+                            if (context.parsed.y !== null) label += formatter.format(context.parsed.y) + ' m²';
                             return label;
                         }
                     }
@@ -455,20 +509,83 @@ function populateSectorCheckboxes(data, defaultIndex) {
     });
 }
 
+// --- PLUGIN CUSTOMIZADO (AJUSTADO: POSIÇÃO INFERIOR) ---
+const periodBackgroundPlugin = {
+    id: 'periodBackgroundPlugin',
+    beforeDraw: (chart) => {
+        const { ctx, chartArea: { top, bottom }, scales: { x } } = chart;
+        
+        ctx.save();
+        
+        const xTicks = x.getTicks(); 
+        if (xTicks.length < 1) {
+            ctx.restore();
+            return;
+        }
+
+        const barHeight = 8; // Altura da barra
+        const yPos = bottom; // Posiciona exatamente ABAIXO da linha do eixo X
+
+        xTicks.forEach((tick, index) => {
+            const label = chart.data.labels[index];
+            const hourMatch = label ? label.match(/(\d+)h/i) : null;
+            if (!hourMatch) return;
+            const hour = parseInt(hourMatch[1]);
+            
+            let color = null;
+            
+            // Cores
+            if (hour >= 7 && hour <= 11) {
+                color = 'rgba(54, 162, 235, 0.4)'; // Manhã
+            } else if (hour >= 13 && hour <= 16) {
+                color = 'rgba(75, 192, 192, 0.4)'; // Tarde
+            } else if (hour === 12 || (hour >= 17 && hour <= 21) || hour === 2) {
+                color = 'rgba(255, 206, 86, 0.4)'; // Fora
+            } else {
+                color = 'rgba(75, 0, 130, 0.4)';   // Noite
+            }
+            
+            if (color) {
+                const currentX = x.getPixelForValue(index);
+                let nextX;
+
+                if (index < xTicks.length - 1) {
+                    nextX = x.getPixelForValue(index + 1);
+                } else {
+                    const prevX = x.getPixelForValue(index - 1);
+                    const stepWidth = currentX - prevX;
+                    nextX = currentX + stepWidth;
+                }
+
+                const width = nextX - currentX;
+
+                ctx.fillStyle = color;
+                ctx.fillRect(currentX, yPos, width, barHeight);
+            }
+        });
+        
+        ctx.restore();
+    }
+};
+
 function displayHourlyChart(selectedSectorNamesArray) {
     const ctx = document.getElementById('hourlyChart').getContext('2d');
     const { headers, data } = parsedDataCache;
 
     const chartColors = ['rgba(239, 68, 68, 1)', 'rgba(54, 162, 235, 1)', 'rgba(75, 192, 192, 1)', 'rgba(255, 206, 86, 1)', 'rgba(139, 92, 246, 1)'];
-    const chartBgColors = ['rgba(239, 68, 68, 0.1)', 'rgba(54, 162, 235, 0.1)', 'rgba(75, 192, 192, 0.1)', 'rgba(255, 206, 86, 0.1)', 'rgba(139, 92, 246, 0.1)'];
+    // Opacidade reduzida para não brigar com a barra
+    const chartBgColors = ['rgba(239, 68, 68, 0.05)', 'rgba(54, 162, 235, 0.05)', 'rgba(75, 192, 192, 0.05)', 'rgba(255, 206, 86, 0.05)', 'rgba(139, 92, 246, 0.05)'];
 
     const chartLabels = [];
     const datasets = [];
 
     headers.forEach(header => {
-        const hour = parseInt(header.replace('h', ''));
-        if (!isNaN(hour) && hour >= 0 && hour <= 23) {
-            chartLabels.push(header);
+        const match = header.match(/(\d+)h/i);
+        if (match) {
+             const hour = parseInt(match[1]);
+             if (!isNaN(hour)) {
+                 chartLabels.push(header);
+             }
         }
     });
 
@@ -500,33 +617,24 @@ function displayHourlyChart(selectedSectorNamesArray) {
     hourlyChartInstance = new Chart(ctx, {
         type: 'line',
         data: { labels: chartLabels, datasets: datasets },
+        plugins: [periodBackgroundPlugin], // Registra o plugin aqui
         options: {
             responsive: true,
-            maintainAspectRatio: false, // Permite altura customizada
+            maintainAspectRatio: false,
             scales: { 
                 y: { 
                     beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return formatter.format(value);
-                        }
-                    }
+                    ticks: { callback: function(value) { return formatter.format(value); } }
                 } 
             },
             plugins: {
-                datalabels: {
-                    display: false
-                },
+                datalabels: { display: false },
                 tooltip: {
                     callbacks: {
                         label: function(context) {
                             let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed.y !== null) {
-                                label += formatter.format(context.parsed.y) + ' m²';
-                            }
+                            if (label) label += ': ';
+                            if (context.parsed.y !== null) label += formatter.format(context.parsed.y) + ' m²';
                             return label;
                         }
                     }
