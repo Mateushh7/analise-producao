@@ -51,7 +51,8 @@
 
 /* --- CONFIGURAÇÕES DE IMPRESSÃO --- */
 @media print {
-    .no-print, nav, #inputSection, footer, #headerControls { display: none !important; }
+    /* REMOVIDO 'nav' desta lista para que o cabeçalho imprima */
+    .no-print, #inputSection, footer, #headerControls { display: none !important; }
     
     @page { margin: 0.5cm; size: landscape; }
 

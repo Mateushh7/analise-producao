@@ -124,6 +124,10 @@ document.getElementById('extractButton').addEventListener('click', () => {
     const inputSection = document.getElementById('inputSection');
     const headerControls = document.getElementById('headerControls');
     const displayDateSpan = document.getElementById('displayDate');
+    
+    // Elementos do novo header
+    const reportHeaderInfo = document.getElementById('reportHeaderInfo');
+    const headerLegend = document.getElementById('headerLegend');
 
     resultsArea.classList.add('hidden');
     showMessage(""); 
@@ -179,15 +183,27 @@ document.getElementById('extractButton').addEventListener('click', () => {
             displayHourlyChart([defaultSectorName]); 
         }
 
+        // Troca de Telas
         inputSection.classList.add('hidden'); 
         resultsArea.classList.remove('hidden');
         headerControls.classList.remove('hidden'); 
+        
+        // Mostra info do header
+        reportHeaderInfo.classList.remove('hidden');
+        // headerLegend continua hidden, só abre com botão
+        
         window.scrollTo({ top: 0, behavior: 'smooth' });
 
     } catch (error) {
         console.error(error);
         showMessage("Erro ao processar dados.", "error");
     }
+});
+
+// Listener do Botão de Info (Toggle Legend)
+document.getElementById('toggleInfoBtn').addEventListener('click', () => {
+    const legend = document.getElementById('headerLegend');
+    legend.classList.toggle('hidden');
 });
 
 document.getElementById('downloadExcelBtn').addEventListener('click', () => {
@@ -225,6 +241,10 @@ document.getElementById('showInputBtn').addEventListener('click', () => {
     document.getElementById('inputSection').classList.remove('hidden');
     document.getElementById('headerControls').classList.add('hidden');
     document.getElementById('resultsArea').classList.add('hidden'); 
+    
+    // Oculta elementos do header ao voltar
+    document.getElementById('reportHeaderInfo').classList.add('hidden');
+    document.getElementById('headerLegend').classList.add('hidden');
     
     rawPasteData = '';
     renderPasteState('empty');
@@ -346,6 +366,9 @@ function updateOverviewData(index, sectorBreakdown) {
     const item = sectorBreakdown[index];
     if (!item) return;
 
+    // Atualiza o texto do título com o nome do setor selecionado
+    document.getElementById('performanceTitle').textContent = `Performance do setor ${item.setor}`;
+
     const calcAvg = (val, dur) => dur > 0 ? val / dur : 0;
     
     document.getElementById('avgManhaDisplay').textContent = formatter.format(calcAvg(item.manha, periodDurations.manha));
@@ -381,7 +404,7 @@ function updateOverviewData(index, sectorBreakdown) {
                     labels: { 
                         usePointStyle: true, 
                         pointStyle: 'circle',
-                        font: { size: 12, family: "'Inter', sans-serif" },
+                        font: { size: 15, family: "'Inter', sans-serif" }, 
                         padding: 20,
                         generateLabels: function(chart) {
                             const data = chart.data;
@@ -527,12 +550,18 @@ const periodBackgroundPlugin = {
 
             const xPos = x.getPixelForValue(index);
             let width = 0;
-            if (index < ticks.length - 1) width = x.getPixelForValue(index + 1) - xPos;
-            else if (index > 0) width = xPos - x.getPixelForValue(index - 1);
+            // Modificado para começar no tick atual e ir até o próximo (direita)
+            if (index < ticks.length - 1) {
+                width = x.getPixelForValue(index + 1) - xPos;
+            } else if (index > 0) {
+                // Para o último, usa a largura do anterior
+                width = xPos - x.getPixelForValue(index - 1);
+            }
             
             ctx.fillStyle = color;
             ctx.globalAlpha = 0.4;
-            ctx.fillRect(xPos - width/2, yPos, width, height);
+            // Desenha a partir de xPos (esquerda) para a direita
+            ctx.fillRect(xPos, yPos, width, height);
         });
         ctx.restore();
     }
@@ -572,7 +601,11 @@ function displayHourlyChart(selectedSectors) {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
-            scales: { y: { beginAtZero: true, grid: { borderDash: [4, 4] } }, x: { grid: { display: false } } },
+            scales: { 
+                y: { beginAtZero: true, grid: { borderDash: [4, 4] } }, 
+                // Alterado: grid.display: true para mostrar linhas verticais
+                x: { grid: { display: true, drawBorder: false } } 
+            },
             plugins: { datalabels: { display: false } }
         }
     });
